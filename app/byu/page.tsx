@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock } from 'lucide-react';
 
 // --- Types ---
 interface Team {
@@ -96,6 +96,8 @@ const ByuPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
     const [tickerPage, setTickerPage] = useState(0);
+    const [isGameLocked, setIsGameLocked] = useState(false);
+    const [currentGameIndex, setCurrentGameIndex] = useState(0);
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -305,10 +307,24 @@ const ByuPage = () => {
             setLoading(false);
             setError(null);
 
-            if (!selectedGameId && filteredGames.length > 0) {
-                // Default to the highest priority active game, or just the highest priority
-                const liveGame = filteredGames.find((g: Game) => g.isLive);
-                setSelectedGameId(liveGame ? liveGame.id : filteredGames[0].id);
+            if (filteredGames.length > 0) {
+                if (!selectedGameId) {
+                    // Default to the highest priority active game, or just the highest priority
+                    const liveGame = filteredGames.find((g: Game) => g.isLive);
+                    const defaultGameId = liveGame ? liveGame.id : filteredGames[0].id;
+                    setSelectedGameId(defaultGameId);
+                    setCurrentGameIndex(filteredGames.findIndex((g: Game) => g.id === defaultGameId));
+                } else {
+                    // Update index if selected game still exists
+                    const index = filteredGames.findIndex((g: Game) => g.id === selectedGameId);
+                    if (index !== -1) {
+                        setCurrentGameIndex(index);
+                    } else {
+                        // Selected game no longer exists, reset to first
+                        setSelectedGameId(filteredGames[0].id);
+                        setCurrentGameIndex(0);
+                    }
+                }
             }
         } catch (err) {
             console.error(err);
@@ -323,61 +339,94 @@ const ByuPage = () => {
         return () => clearInterval(interval);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Ticker Auto-Scroll
+    // Ticker Auto-Scroll - Always show 4 slots per page
     useEffect(() => {
+        if (games.length === 0) return;
         const interval = setInterval(() => {
             setTickerPage(prev => {
+                const totalPages = Math.ceil(games.length / 4);
                 const nextPage = prev + 1;
-                return (nextPage * 4 < games.length) ? nextPage : 0;
+                return nextPage < totalPages ? nextPage : 0;
             });
         }, 10000);
         return () => clearInterval(interval);
     }, [games.length]);
 
+    // Marquee Game Auto-Rotation
+    useEffect(() => {
+        if (isGameLocked || games.length === 0) return;
+
+        const interval = setInterval(() => {
+            setCurrentGameIndex(prev => {
+                const nextIndex = (prev + 1) % games.length;
+                setSelectedGameId(games[nextIndex].id);
+                return nextIndex;
+            });
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, [isGameLocked, games]);
+
     const activeGame = games.find(g => g.id === selectedGameId) || games[0];
+    // Always show 4 slots - pad with empty games if needed
     const visibleTickerGames = games.slice(tickerPage * 4, (tickerPage + 1) * 4);
+    const emptySlotsCount = Math.max(0, 4 - visibleTickerGames.length);
+
+    const handleGameSelect = (gameId: string) => {
+        setSelectedGameId(gameId);
+        const index = games.findIndex(g => g.id === gameId);
+        if (index !== -1) {
+            setCurrentGameIndex(index);
+        }
+    };
+
+    const toggleLock = () => {
+        setIsGameLocked(prev => !prev);
+    };
 
     const nextTickerPage = () => {
         setTickerPage(prev => {
+            const totalPages = Math.ceil(games.length / 4);
             const nextPage = prev + 1;
-            return (nextPage * 4 < games.length) ? nextPage : 0;
+            return nextPage < totalPages ? nextPage : 0;
         });
     };
 
     const prevTickerPage = () => {
         setTickerPage(prev => {
+            const totalPages = Math.ceil(games.length / 4);
             const prevPage = prev - 1;
-            return prevPage >= 0 ? prevPage : Math.floor((games.length - 1) / 4);
+            return prevPage >= 0 ? prevPage : totalPages - 1;
         });
     };
 
     return (
-        <div className="flex flex-col h-screen bg-[#002E5D] text-white font-sans overflow-hidden">
+        <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 text-gray-900 font-sans overflow-hidden">
 
             {/* Main Feature Area */}
-            <main className="flex-1 relative bg-gradient-to-br from-[#002E5D] via-[#001f3f] to-black overflow-hidden flex flex-col">
+            <main className="flex-1 relative overflow-hidden flex flex-col">
 
                 {/* Header Overlay */}
-                <header className="absolute top-0 w-full z-20 p-6 flex flex-wrap justify-between items-start gap-4 bg-gradient-to-b from-black/60 to-transparent">
+                <header className="absolute top-0 w-full z-20 p-6 flex flex-wrap justify-between items-start gap-4 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm">
                     <div className="flex items-center gap-4">
                         {/* BYU Logo */}
-                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg shadow-white/20 p-1">
+                        <div className="w-12 h-12 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/50 p-1">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/logo1.png" alt="BYU" className="w-full h-full object-contain" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black italic tracking-tighter text-white">PLAYOFF<span className="text-[#002E5D] text-stroke-white">TRACKER</span></h1>
-                            <p className="text-xs text-slate-300 font-medium tracking-widest uppercase">Road to the CFP</p>
+                            <h1 className="text-2xl font-black italic tracking-tighter text-[#0062B8]">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
+                            <p className="text-xs text-gray-600 font-medium tracking-widest uppercase">Road to the CFP</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex flex-col items-end text-right">
-                            <span className="text-[10px] text-slate-300 uppercase tracking-widest font-bold">Last Updated</span>
-                            <span className="text-xs font-mono text-white">{lastUpdated.toLocaleTimeString()}</span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
+                            <span className="text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
                         </div>
-                        <button onClick={fetchGames} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : 'text-white'}`} />
+                        <button onClick={fetchGames} className="p-2 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40">
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : 'text-[#0062B8]'}`} />
                         </button>
                     </div>
                 </header>
@@ -386,23 +435,40 @@ const ByuPage = () => {
                 <div className="flex-1 flex overflow-hidden">
 
                     {/* Left: Main Game Display */}
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 pb-24 relative z-10">
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 pb-24 relative z-10 pt-40">
                         {activeGame ? (
                             <div className="w-full max-w-5xl flex flex-col items-center animate-in fade-in duration-700">
 
                                 {/* Rooting Context Badge */}
-                                <div className="mb-8 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/20 flex items-center gap-3">
-                                    <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">We Want:</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-black text-lg text-white">{activeGame.rootingInterest?.teamName}</span>
-                                        {activeGame.rootingInterest?.status === 'winning' || activeGame.rootingInterest?.status === 'won' ? (
-                                            <CheckCircle2 className="w-5 h-5 text-green-400" />
-                                        ) : activeGame.rootingInterest?.status === 'pending' ? (
-                                            <AlertCircle className="w-5 h-5 text-slate-400" />
-                                        ) : (
-                                            <XCircle className="w-5 h-5 text-red-500" />
-                                        )}
+                                <div className="mb-8 flex items-center gap-3 z-30">
+                                    <div className="bg-[#0062B8]/90 backdrop-blur-xl px-8 py-3 rounded-2xl border border-white/30 shadow-xl flex items-center gap-3">
+                                        <span className="text-sm font-bold text-white uppercase tracking-widest">We Want:</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-black text-xl text-white">{activeGame.rootingInterest?.teamName}</span>
+                                            {activeGame.rootingInterest?.status === 'winning' || activeGame.rootingInterest?.status === 'won' ? (
+                                                <CheckCircle2 className="w-6 h-6 text-green-200" />
+                                            ) : activeGame.rootingInterest?.status === 'pending' ? (
+                                                <AlertCircle className="w-6 h-6 text-gray-200" />
+                                            ) : (
+                                                <XCircle className="w-6 h-6 text-red-200" />
+                                            )}
+                                        </div>
                                     </div>
+                                    <button
+                                        onClick={toggleLock}
+                                        className={`p-3 rounded-xl backdrop-blur-xl border transition-all shadow-lg ${
+                                            isGameLocked 
+                                                ? 'bg-[#0062B8]/90 border-white/30 text-white hover:bg-[#0062B8]' 
+                                                : 'bg-white/60 border-white/40 text-[#0062B8] hover:bg-white/80'
+                                        }`}
+                                        title={isGameLocked ? 'Unlock to auto-rotate games' : 'Lock current game'}
+                                    >
+                                        {isGameLocked ? (
+                                            <Lock className="w-5 h-5" />
+                                        ) : (
+                                            <Unlock className="w-5 h-5" />
+                                        )}
+                                    </button>
                                 </div>
 
                                 {/* Scoreboard */}
@@ -410,10 +476,10 @@ const ByuPage = () => {
                                     <BigTeamDisplay team={activeGame.away} isOpponentWinner={activeGame.home.isWinner} align="right" />
 
                                     <div className="flex flex-col items-center gap-4">
-                                        <div className="text-4xl md:text-6xl font-black text-white/20 italic select-none">VS</div>
+                                        <div className="text-4xl md:text-6xl font-black text-gray-300/40 italic select-none">VS</div>
                                         {activeGame.isLive && activeGame.situation.downDistanceText && (
-                                            <div className="flex flex-col items-center bg-black/40 backdrop-blur rounded-xl px-4 py-2 border border-white/10 shadow-2xl">
-                                                <span className="text-xl md:text-2xl font-bold text-yellow-400 font-mono tracking-tight">
+                                            <div className="flex flex-col items-center bg-[#002E5D]/90 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/20 shadow-xl">
+                                                <span className="text-xl md:text-2xl font-bold text-white font-mono tracking-tight">
                                                     {activeGame.situation.downDistanceText}
                                                 </span>
                                             </div>
@@ -426,39 +492,39 @@ const ByuPage = () => {
                                 {/* Game Details / Last Play / Leaders */}
                                 <div className="mt-12 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-center gap-2 text-slate-300 text-sm">
-                                            <MapPin className="w-4 h-4" />
+                                        <div className="flex items-center justify-center gap-2 text-gray-700 text-sm font-medium">
+                                            <MapPin className="w-4 h-4 text-[#0062B8]" />
                                             {activeGame.venue}
                                         </div>
                                         {activeGame.situation?.lastPlay && (
-                                            <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-center">
+                                            <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl p-4 text-center shadow-lg">
                                                 <div className="flex items-center justify-center gap-2 mb-1">
-                                                    <PlayCircle className="w-4 h-4 text-blue-300" />
-                                                    <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">Last Play</span>
+                                                    <PlayCircle className="w-4 h-4 text-[#0062B8]" />
+                                                    <span className="text-xs font-bold text-[#0062B8] uppercase tracking-wider">Last Play</span>
                                                 </div>
-                                                <p className="text-slate-200 leading-relaxed font-medium">"{activeGame.situation.lastPlay}"</p>
+                                                <p className="text-gray-700 leading-relaxed font-medium">"{activeGame.situation.lastPlay}"</p>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Leaders Module */}
                                     {activeGame.leaders && activeGame.leaders.length > 0 && (
-                                        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-white/10 pb-2">Game Leaders</h3>
+                                        <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-white/40 shadow-lg">
+                                            <h3 className="text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-3 border-b border-gray-200/50 pb-2">Game Leaders</h3>
                                             <div className="space-y-3">
                                                 {activeGame.leaders.slice(0, 3).map((leader, i) => (
                                                     <div key={i} className="flex items-center gap-3">
                                                         {leader.athlete.headshot ? (
                                                             // eslint-disable-next-line @next/next/no-img-element
-                                                            <img src={leader.athlete.headshot} alt="" className="w-8 h-8 rounded-full bg-slate-700 object-cover" />
+                                                            <img src={leader.athlete.headshot} alt="" className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm" />
                                                         ) : (
-                                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px]">{leader.athlete.position}</div>
+                                                            <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[10px] text-gray-600 shadow-sm">{leader.athlete.position}</div>
                                                         )}
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="text-sm font-bold text-slate-200 truncate">{leader.athlete.shortName}</div>
-                                                            <div className="text-xs text-slate-400 truncate">{leader.name}</div>
+                                                            <div className="text-sm font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
+                                                            <div className="text-xs text-gray-600 truncate">{leader.name}</div>
                                                         </div>
-                                                        <div className="text-sm font-mono font-bold text-blue-300">{leader.displayValue}</div>
+                                                        <div className="text-sm font-mono font-bold text-[#0062B8]">{leader.displayValue}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -467,15 +533,15 @@ const ByuPage = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-white/50">Loading Playoff Scenarios...</div>
+                            <div className="text-gray-400">Loading Playoff Scenarios...</div>
                         )}
                     </div>
 
                     {/* Right: Playoff Implications Sidebar */}
-                    <div className="w-80 bg-black/20 backdrop-blur-xl border-l border-white/10 hidden xl:flex flex-col">
-                        <div className="p-4 border-b border-white/10 bg-[#002E5D]/80">
+                    <div className="w-80 bg-white/40 backdrop-blur-xl border-l border-white/30 hidden xl:flex flex-col pt-24 shadow-lg">
+                        <div className="p-4 border-b border-white/20 bg-[#0062B8]/90 backdrop-blur-xl">
                             <h2 className="font-black text-white uppercase tracking-wider flex items-center gap-2">
-                                <Trophy className="w-4 h-4 text-yellow-400" />
+                                <Trophy className="w-4 h-4 text-white" />
                                 Rooting Guide
                             </h2>
                         </div>
@@ -485,30 +551,30 @@ const ByuPage = () => {
                                 {games.map((game, idx) => (
                                     <button
                                         key={game.id}
-                                        onClick={() => setSelectedGameId(game.id)}
-                                        className={`w-full text-left p-2 rounded-lg border transition-all
-                                    ${selectedGameId === game.id ? 'bg-white/10 border-white/30' : 'bg-transparent border-transparent hover:bg-white/5'}
+                                        onClick={() => handleGameSelect(game.id)}
+                                        className={`w-full text-left p-2 rounded-xl border transition-all backdrop-blur-md
+                                    ${selectedGameId === game.id ? 'bg-[#0062B8]/20 border-[#0062B8]/40 shadow-md' : 'bg-white/60 border-white/40 hover:bg-white/80 hover:border-white/60'}
                                 `}
                                     >
                                         <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase">#{idx + 1}</span>
+                                            <span className="text-[9px] font-bold text-gray-500 uppercase">#{idx + 1}</span>
                                             <span className={`text-[9px] font-bold px-1 rounded 
-                                        ${game.rootingInterest?.status === 'winning' || game.rootingInterest?.status === 'won' ? 'bg-green-500/20 text-green-400' :
-                                                    game.rootingInterest?.status === 'pending' ? 'bg-slate-700 text-slate-400' : 'bg-red-500/20 text-red-400'}
+                                        ${game.rootingInterest?.status === 'winning' || game.rootingInterest?.status === 'won' ? 'bg-green-100 text-green-700' :
+                                                    game.rootingInterest?.status === 'pending' ? 'bg-gray-200 text-gray-600' : 'bg-red-100 text-red-700'}
                                     `}>
                                                 {game.rootingInterest?.status.toUpperCase()}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between gap-1">
                                             <div className="flex flex-col min-w-0">
-                                                <span className={`font-bold text-xs leading-tight truncate ${game.rootingInterest?.teamId === game.away.id ? 'text-yellow-400' : 'text-white'}`}>
+                                                <span className={`font-bold text-xs leading-tight truncate ${game.rootingInterest?.teamId === game.away.id ? 'text-[#0062B8]' : 'text-gray-900'}`}>
                                                     {game.away.shortName}
                                                 </span>
-                                                <span className={`font-bold text-xs leading-tight truncate ${game.rootingInterest?.teamId === game.home.id ? 'text-yellow-400' : 'text-white'}`}>
+                                                <span className={`font-bold text-xs leading-tight truncate ${game.rootingInterest?.teamId === game.home.id ? 'text-[#0062B8]' : 'text-gray-900'}`}>
                                                     {game.home.shortName}
                                                 </span>
                                             </div>
-                                            <div className="flex flex-col items-end font-mono font-bold text-xs">
+                                            <div className="flex flex-col items-end font-mono font-bold text-xs text-gray-900">
                                                 <span>{game.away.score}</span>
                                                 <span>{game.home.score}</span>
                                             </div>
@@ -522,8 +588,8 @@ const ByuPage = () => {
             </main>
 
             {/* THE TICKER - Fixed Bottom */}
-            <footer className="h-28 bg-[#001f3f] border-t border-white/10 flex relative z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-        <div className="bg-[#002E5D] px-4 flex items-center justify-center z-40 shadow-xl border-r border-white/10">
+            <footer className="h-28 bg-[#002E5D]/90 backdrop-blur-xl border-t border-white/20 flex relative z-30 shadow-2xl">
+        <div className="bg-[#0062B8]/90 backdrop-blur-xl px-4 flex items-center justify-center z-40 shadow-xl border-r border-white/20">
             <span className="text-xs font-black text-white leading-none text-center">
                 IMPACT<br />GAMES
             </span>
@@ -531,7 +597,7 @@ const ByuPage = () => {
 
         {/* Scroll Container */}
         <div className="flex-1 flex items-stretch overflow-hidden">
-    <button onClick={prevTickerPage} className="w-8 bg-[#002E5D]/50 hover:bg-[#002E5D] flex items-center justify-center border-r border-white/10 z-10 transition-colors">
+    <button onClick={prevTickerPage} className="w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 flex items-center justify-center border-r border-white/10 z-10 transition-all">
         <ChevronLeft className="w-5 h-5 text-white" />
     </button>
 
@@ -539,19 +605,19 @@ const ByuPage = () => {
         {visibleTickerGames.map((game) => (
             <button
                 key={game.id}
-                onClick={() => setSelectedGameId(game.id)}
-                className={`group flex-1 px-4 py-2 flex flex-col justify-between transition-colors relative overflow-hidden
-                  ${selectedGameId === game.id ? 'bg-white/10' : 'hover:bg-white/5'}
+                onClick={() => handleGameSelect(game.id)}
+                className={`group flex-1 px-4 py-2 flex flex-col justify-between transition-all relative overflow-hidden backdrop-blur-sm
+                  ${selectedGameId === game.id ? 'bg-white/10 border-t border-white/30' : 'hover:bg-white/5'}
                 `}
             >
                 {/* Active Indicator Bar */}
                 {selectedGameId === game.id && (
-                    <div className="absolute top-0 left-0 w-full h-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]"></div>
+                    <div className="absolute top-0 left-0 w-full h-0.5 bg-[#0062B8] shadow-sm"></div>
                 )}
 
                 {/* Row 1: Header */}
-                <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase font-bold tracking-wider w-full">
-                    <span className={`truncate mr-2 ${game.isLive ? 'text-red-500 animate-pulse' : ''}`}>
+                <div className="flex justify-between items-center text-[10px] text-gray-300 uppercase font-bold tracking-wider w-full">
+                    <span className={`truncate mr-2 ${game.isLive ? 'text-red-400 animate-pulse' : ''}`}>
                         {game.statusDetail}
                     </span>
                     <span className="truncate">{game.broadcast}</span>
@@ -575,13 +641,13 @@ const ByuPage = () => {
                 <div className="h-4 flex items-center justify-end w-full">
                     {game.alert ? (
                         <div className={`text-[9px] font-black px-1.5 py-0.5 rounded animate-pulse
-                       ${game.alert.type === 'TOUCHDOWN' ? 'bg-yellow-500 text-black' : 'bg-red-600 text-white'}
+                       ${game.alert.type === 'TOUCHDOWN' ? 'bg-yellow-400 text-black' : 'bg-red-500 text-white'}
                      `}>
                             {game.alert.text}
                         </div>
                     ) : (
                         game.isLive && game.situation.downDistanceText && (
-                            <div className="text-[10px] text-yellow-400 font-mono opacity-100 font-bold">
+                            <div className="text-[10px] text-white font-mono opacity-100 font-bold">
                                 {game.situation.downDistanceText}
                             </div>
                         )
@@ -590,12 +656,13 @@ const ByuPage = () => {
             </button>
         ))}
 
-        {Array.from({ length: Math.max(0, 4 - visibleTickerGames.length) }).map((_, i) => (
-            <div key={`empty-${i}`} className="flex-1 bg-transparent"></div>
+        {/* Always show 4 slots - fill empty slots */}
+        {Array.from({ length: emptySlotsCount }).map((_, i) => (
+            <div key={`empty-${i}`} className="flex-1 bg-transparent backdrop-blur-sm border-r border-white/10 last:border-r-0"></div>
         ))}
     </div>
 
-    <button onClick={nextTickerPage} className="w-8 bg-[#002E5D]/50 hover:bg-[#002E5D] flex items-center justify-center border-l border-white/10 z-10 transition-colors">
+    <button onClick={nextTickerPage} className="w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 flex items-center justify-center border-l border-white/10 z-10 transition-all">
         <ChevronRight className="w-5 h-5 text-white" />
     </button>
 </div>
@@ -612,12 +679,12 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
 
     return (
         <div className={`flex flex-col gap-4 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-            <div className={`relative w-24 h-24 md:w-32 md:h-32 p-4 bg-white/10 rounded-full border-2 ${isWinner ? 'border-yellow-500/50 shadow-[0_0_30px_rgba(234,179,8,0.2)]' : 'border-white/5'}`}>
+            <div className={`relative w-24 h-24 md:w-32 md:h-32 p-4 bg-white/70 backdrop-blur-xl rounded-full border ${isWinner ? 'border-[#0062B8]/50 shadow-xl' : 'border-white/50'} shadow-lg`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={team.logo} alt={team.name} className={`w-full h-full object-contain drop-shadow-2xl ${isLoser ? 'grayscale opacity-70' : ''}`} />
+                <img src={team.logo} alt={team.name} className={`w-full h-full object-contain drop-shadow-lg ${isLoser ? 'grayscale opacity-70' : ''}`} />
                 {team.hasBall && (
-                    <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1.5 shadow-lg border-2 border-slate-900">
-                        <div className="w-3 h-3 bg-yellow-900 rounded-full"></div>
+                    <div className="absolute -bottom-1 -right-1 bg-[#0062B8] rounded-full p-1.5 shadow-lg border-2 border-white backdrop-blur-sm">
+                        <div className="w-3 h-3 bg-[#002E5D] rounded-full"></div>
                     </div>
                 )}
             </div>
@@ -625,13 +692,13 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
             <div className="space-y-1">
                 <div className="flex items-center gap-2">
                     {align === 'left' && team.rank && <RankBadge rank={team.rank} />}
-                    <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight leading-none">{team.shortName}</h2>
+                    <h2 className="text-2xl md:text-4xl font-black text-[#002E5D] tracking-tight leading-none">{team.shortName}</h2>
                     {align === 'right' && team.rank && <RankBadge rank={team.rank} />}
                 </div>
-                <p className="text-lg text-slate-400 font-medium">{team.record || '0-0'}</p>
+                <p className="text-lg text-gray-600 font-medium">{team.record || '0-0'}</p>
             </div>
 
-            <div className={`text-6xl md:text-8xl font-black font-mono tracking-tighter ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+            <div className={`text-6xl md:text-8xl font-black font-mono tracking-tighter ${isWinner ? 'text-[#0062B8]' : 'text-[#002E5D]'}`}>
                 {team.score || '0'}
             </div>
         </div>
@@ -644,22 +711,22 @@ const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: bo
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
             <div className="flex flex-col min-w-0">
-                <span className={`text-sm font-bold truncate ${isRootedFor ? 'text-yellow-400' : 'text-slate-200'}`}>
-                    {team.rank && <span className="text-[10px] text-slate-500 mr-1">{team.rank}</span>}
+                <span className={`text-sm font-bold truncate ${isRootedFor ? 'text-[#0062B8]' : 'text-white'}`}>
+                    {team.rank && <span className="text-[10px] text-gray-300 mr-1">{team.rank}</span>}
                     {team.shortName}
-                    {isRootedFor && <span className="ml-1 text-[8px] bg-white/20 px-1 rounded text-white">US</span>}
+                    {isRootedFor && <span className="ml-1 text-[8px] bg-[#0062B8] px-1 rounded text-white">US</span>}
                 </span>
             </div>
-            {hasBall && <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />}
+            {hasBall && <div className="w-1.5 h-1.5 rounded-full bg-[#0062B8] animate-pulse flex-shrink-0" />}
         </div>
-        <span className={`font-mono font-black text-sm ${team.isWinner ? 'text-yellow-400' : 'text-white'}`}>
+        <span className={`font-mono font-black text-sm ${team.isWinner ? 'text-[#0062B8]' : 'text-white'}`}>
             {team.score || '0'}
         </span>
     </div>
 );
 
 const RankBadge = ({ rank }: { rank: number }) => (
-    <span className="bg-slate-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded leading-none">{rank}</span>
+    <span className="bg-[#002E5D]/90 backdrop-blur-md text-white text-[10px] font-bold px-1.5 py-0.5 rounded-lg leading-none border border-white/20 shadow-sm">{rank}</span>
 );
 
 export default ByuPage;
