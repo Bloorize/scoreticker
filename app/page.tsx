@@ -205,7 +205,6 @@ const ByuPage = () => {
                 };
 
                 // Log every game to see what ESPN is returning
-                console.log(`📊 Game: ${awayTeam.name} (${awayTeam.shortName}) @ ${homeTeam.name} (${homeTeam.shortName})`);
 
                 // Determine Rooting Interest - check if this is one of our specific matchups
                 let rootingInterest = undefined;
@@ -273,14 +272,12 @@ const ByuPage = () => {
 
                     // Debug logging
                     if (isMatch) {
-                        console.log(`✅ MATCHED: ${homeTeam.name} vs ${awayTeam.name} -> Rooting for ${m.team}`);
                     }
 
                     return isMatch;
                 });
 
                 // Log all games for debugging
-                console.log(`Game: ${homeTeam.name} (${homeTeam.shortName}) vs ${awayTeam.name} (${awayTeam.shortName}) - ${matchup ? 'MATCHED' : 'NO MATCH'}`);
 
                 if (matchup) {
                     // Determine which team is "our team"
@@ -457,7 +454,6 @@ const ByuPage = () => {
                 }
             }
         } catch (err) {
-            console.error(err);
             setError("Unable to load scoreboard.");
             setLoading(false);
         }
@@ -471,8 +467,6 @@ const ByuPage = () => {
             const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
             
             if (!supabaseUrl || !supabaseKey) {
-                console.warn('⚠️ Supabase credentials not configured. SOR data will not be available.');
-                console.warn('   Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local');
                 return {};
             }
             
@@ -619,20 +613,17 @@ const ByuPage = () => {
 
             // If team_strength_of_record doesn't exist, try college_football_fpi
             if (sorRecordError && (sorRecordError.code === '42P01' || sorRecordError.message?.includes('does not exist'))) {
-                console.log('📊 team_strength_of_record table not found, trying college_football_fpi...');
                 const { data: fpiData, error: fpiError } = await supabase
                     .from('college_football_fpi')
                     .select('team_name, strength_of_record_rank');
                 
                 if (fpiError && (fpiError.code === '42P01' || fpiError.message?.includes('does not exist'))) {
-                    console.log('📊 college_football_fpi table not found, trying team_sor table...');
                     const { data: sorData, error: sorError } = await supabase
                         .from('team_sor')
                         .select('team_id, team_short_name, sor_value')
                         .eq('season', 2025);
                     
                     if (sorError) {
-                        console.error('❌ Error fetching SOR data:', sorError);
                         return {};
                     }
                     
@@ -647,14 +638,12 @@ const ByuPage = () => {
                             }
                         });
                         setSorData(sorMap);
-                        console.log('✅ Loaded SOR data from team_sor:', Object.keys(sorMap).length, 'teams');
                         return sorMap;
                     }
                     return {};
                 }
                 
                 if (fpiError) {
-                    console.error('❌ Error fetching SOR data:', fpiError);
                     return {};
                 }
                 
@@ -666,7 +655,6 @@ const ByuPage = () => {
             }
 
             if (error) {
-                console.error('❌ Error fetching SOR data:', error);
                 return {};
             }
 
@@ -699,14 +687,11 @@ const ByuPage = () => {
                     }
                 });
                 setSorData(sorMap);
-                console.log('✅ Loaded SOR data:', Object.keys(sorMap).length, 'team identifiers');
                 return sorMap;
             } else {
-                console.warn('⚠️ No SOR data returned from Supabase');
                 return {};
             }
         } catch (err) {
-            console.error('❌ Exception fetching SOR data:', err);
             return {};
         }
     };
@@ -735,7 +720,6 @@ const ByuPage = () => {
                     ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
                 }
             } catch (err) {
-                console.error('AdSense initialization error:', err);
             }
         };
 

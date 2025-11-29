@@ -36,7 +36,6 @@ export async function GET() {
             });
         }
         
-        console.log(`📋 Extracted ${Object.keys(teamRecordsMap).length} records from rankings`);
         
         // Fetch scoreboard to get team records (most reliable source)
         // Fetch current week's scoreboard - this should have records for all teams playing
@@ -97,7 +96,6 @@ export async function GET() {
             }
         });
         
-        console.log(`📋 Extracted ${Object.keys(teamRecordsMap).length} records from scoreboard (${Object.keys(teamRecordsById).length} by ID)`);
         
         // Also try standings API as backup
         const standingsUrl = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/standings?_=${timestamp}`;
@@ -153,9 +151,6 @@ export async function GET() {
                 });
             }
             
-            console.log(`📋 Total records after standings: ${Object.keys(teamRecordsMap).length}`);
-        } else {
-            console.warn('⚠️ Standings API failed:', standingsResponse.status);
         }
         
         return NextResponse.json({
@@ -164,7 +159,6 @@ export async function GET() {
             recordsById: teamRecordsById, // Also return by ID for better matching
         });
     } catch (error) {
-        console.error('Error fetching playoff rankings:', error);
         return NextResponse.json(
             { error: 'Failed to fetch rankings' },
             { status: 500 }

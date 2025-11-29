@@ -104,7 +104,7 @@ const PlayoffsPage = () => {
                 .select('team_name, conference, sor_rank, rank_id');
 
             if (sorError) {
-                console.error('Error fetching SOR data:', sorError);
+                // Silently handle SOR data fetch error
             }
 
             // Step 2: Fetch live rankings and records from our API route (avoids CORS)
@@ -117,7 +117,6 @@ const PlayoffsPage = () => {
             }
             
             const { rankings: rankingsData, records: teamRecordsMapFromAPI, recordsById: recordsByIdFromAPI } = await apiResponse.json();
-            console.log('📊 ESPN Rankings API Response:', rankingsData);
             
             // Step 2b: Also fetch scoreboard directly (same as main page) to get most up-to-date records
             // Use the EXACT SAME URL as main page for consistency
@@ -207,32 +206,6 @@ const PlayoffsPage = () => {
                 }
             });
             
-            // Log Texas A&M specifically with date info
-            if (scoreboardRecordsByDate['245']) {
-                console.log(`📅 Texas A&M record by date:`, scoreboardRecordsByDate['245']);
-            }
-            
-            // Log specific teams for debugging
-            ['194', '84', '245'].forEach(teamId => {
-                if (scoreboardRecordsById[teamId]) {
-                    console.log(`📋 Team ID ${teamId} record from scoreboard: ${scoreboardRecordsById[teamId]}`);
-                } else {
-                    console.warn(`⚠️ Team ID ${teamId} NOT found in scoreboard records. Available IDs:`, Object.keys(scoreboardRecordsById).slice(0, 20));
-                }
-            });
-            
-            // Also check if we can find Texas A&M by searching all records
-            const tamRecord = Object.entries(scoreboardRecordsById).find(([id, rec]) => 
-                id === '245' || String(id) === '245'
-            );
-            if (tamRecord) {
-                console.log(`✅ Found Texas A&M (ID 245) record: ${tamRecord[1]}`);
-            } else {
-                console.warn(`⚠️ Texas A&M (ID 245) NOT found in scoreboard. Checking all IDs...`);
-                console.log('All scoreboard team IDs:', Object.keys(scoreboardRecordsById));
-            }
-            
-            console.log(`📋 Scoreboard records (direct): ${Object.keys(scoreboardRecordsById).length} teams`);
             
             // Step 3: Initialize team records map - prioritize scoreboard records (same as main page)
             const teamRecordsMap: Record<string, string> = teamRecordsMapFromAPI || {};
@@ -258,7 +231,6 @@ const PlayoffsPage = () => {
                 });
             }
             
-            console.log(`📋 Total records: ${Object.keys(teamRecordsMap).length} by name, ${Object.keys(teamRecordsById).length} by ID`);
 
             // Step 4: Process rankings data
             const teamsFromAPI: BracketTeam[] = [];
@@ -272,12 +244,9 @@ const PlayoffsPage = () => {
             ) || polls.find((p: any) => p.name?.toLowerCase().includes('ap')) || polls[0];
             
             if (cfpPoll && cfpPoll.ranks) {
-                console.log(`📋 Found ${cfpPoll.ranks.length} teams in ${cfpPoll.name} poll`);
-                
                 cfpPoll.ranks.forEach((rank: any, index: number) => {
                     const team = rank.team;
                     if (!team) {
-                        console.warn(`⚠️ Rank ${index + 1} has no team object:`, rank);
                         return;
                     }
                     
@@ -351,17 +320,6 @@ const PlayoffsPage = () => {
                         }
                     }
                     
-                    // Log for debugging - show what we found (especially for teams that might have wrong records)
-                    if (teamName && (teamName.toLowerCase().includes('ohio state') || teamName.toLowerCase().includes('indiana') || teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies'))) {
-                        console.log(`📊 ${teamName} (ID: ${teamIdStr}):`, {
-                            rank: rank.current || index + 1,
-                            finalRecord: record,
-                            fromScoreboardId: teamIdStr && teamRecordsById[teamIdStr] ? `YES: ${teamRecordsById[teamIdStr].record}` : 'NO',
-                            fromScoreboardMap: teamName && teamRecordsMap[teamName] ? `YES: ${teamRecordsMap[teamName]}` : 'NO',
-                            fromRankings: rank.record?.summary || 'NO',
-                            allTeamIds: Object.keys(teamRecordsById).slice(0, 10),
-                        });
-                    }
                     
                     // Find matching SOR data - try multiple matching strategies
                     let sorMatch = sorData?.find((s: any) => {
@@ -431,16 +389,6 @@ const PlayoffsPage = () => {
                             finalLogo = metadata.logo; // Force Texas A&M logo
                         }
                         
-                        // Log Texas A&M specifically to verify record is correct
-                        if (teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies') || teamIdStr === '245') {
-                            console.log(`🔍 Creating Texas A&M team object:`, {
-                                teamId: teamIdStr,
-                                teamName,
-                                record,
-                                fromScoreboard: teamRecordsById[teamIdStr]?.record || 'NO',
-                                fromMap: teamRecordsMap[teamName] || 'NO',
-                            });
-                        }
                         
                         teamsFromAPI.push({
                             rank: rank.current || (index + 1),
@@ -462,10 +410,6 @@ const PlayoffsPage = () => {
                             // Only update if we have scoreboard data (most reliable)
                             existingTeam.record = record;
                             
-                            // Log if this is Texas A&M
-                            if (teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies') || teamIdStr === '245') {
-                                console.log(`🔄 Updated existing Texas A&M record: ${existingTeam.record} -> ${record}`);
-                            }
                         }
                         if (!existingTeam.sor && sorMatch?.sor_rank) {
                             existingTeam.sor = sorMatch.sor_rank;
@@ -488,7 +432,6 @@ const PlayoffsPage = () => {
                     }
                 });
             } else {
-                console.warn('⚠️ No CFP poll found or no ranks available. Available polls:', polls.map((p: any) => p.name));
             }
 
             // Step 5: Deduplicate teams by team ID (extract ESPN ID from team.id)
@@ -522,21 +465,8 @@ const PlayoffsPage = () => {
             // Convert map back to array
             const deduplicatedTeams = Array.from(uniqueTeamsMap.values());
             
-            console.log(`📋 Deduplicated: ${teamsFromAPI.length} -> ${deduplicatedTeams.length} teams`);
-            
-            // Log any remaining duplicates by name for debugging
-            const nameCounts = new Map<string, number>();
-            deduplicatedTeams.forEach(t => {
-                nameCounts.set(t.name, (nameCounts.get(t.name) || 0) + 1);
-            });
-            const duplicates = Array.from(nameCounts.entries()).filter(([_, count]) => count > 1);
-            if (duplicates.length > 0) {
-                console.warn('⚠️ Still have duplicates by name:', duplicates);
-            }
-            
             return deduplicatedTeams.length > 0 ? deduplicatedTeams : CURRENT_PLAYOFF_TEAMS;
         } catch (err) {
-            console.error('Exception fetching teams:', err);
             return CURRENT_PLAYOFF_TEAMS;
         } finally {
             setLoading(false);
@@ -652,12 +582,9 @@ const PlayoffsPage = () => {
                        (conf === 'Big Ten' && (confLower.includes('bigten') || confLower.includes('big ten')));
             });
             
-            console.log(`📋 ${conf} teams found:`, conferenceTeams.map(t => `${t.shortName} (${t.record}, SOR: ${t.sor})`));
-            
-            if (conferenceTeams.length === 0) {
-                console.warn(`⚠️ No teams found for ${conf}`);
-                return;
-            }
+                if (conferenceTeams.length === 0) {
+                    return;
+                }
             
             // Sort by: 1) Losses (asc), 2) Ranking for undefeated (lower rank = better), 3) Wins (desc), 4) Head-to-head, 5) SOR (asc)
             const sorted = [...conferenceTeams].sort((a, b) => {
@@ -710,11 +637,6 @@ const PlayoffsPage = () => {
             
             if (sorted.length > 0) {
                 const leader = sorted[0];
-                console.log(`✅ ${conf} Leader: ${leader.shortName} (${leader.record}, Rank: ${leader.rank}, SOR: ${leader.sor})`);
-                // Log top 3 for debugging
-                if (sorted.length > 1) {
-                    console.log(`   Top 3: ${sorted.slice(0, 3).map(t => `${t.shortName} (${t.record}, Rank: ${t.rank})`).join(', ')}`);
-                }
                 conferenceLeaders.push(leader);
             }
         });
@@ -809,7 +731,6 @@ const PlayoffsPage = () => {
             });
             
             const finalTeams = Array.from(finalUniqueTeams.values());
-            console.log(`📋 Final processed teams: ${finalTeams.length} (from ${processedTeams.length} fetched)`);
             
             setAllTeams(finalTeams);
             
@@ -905,21 +826,6 @@ const PlayoffsPage = () => {
                 })),
             ];
 
-            console.log('🏆 Power 4 Auto-Bids:', autoBids.map(t => `${t.shortName} (${t.conference}, Rank: ${t.rank})`));
-            console.log('📊 Top At-Large Teams:', topAtLarge.slice(0, 8).map(t => `${t.shortName} (${t.record}, Rank: ${t.rank}, Score: ${t.fairRankScore.toFixed(1)})`));
-            
-            // Check if Ohio State is missing
-            const ohioState = allTeams.find(t => t.id?.includes('194') || t.name?.toLowerCase().includes('ohio state'));
-            if (ohioState) {
-                const inAutoBids = autoBids.find(t => t.id === ohioState.id);
-                const inAtLarge = topAtLarge.find(t => t.id === ohioState.id);
-                if (!inAutoBids && !inAtLarge) {
-                    console.warn(`⚠️ Ohio State (${ohioState.record}, Rank: ${ohioState.rank}) is MISSING from playoff bracket!`);
-                    console.warn(`   Conference: ${ohioState.conference}, Score: ${teamsWithScores.find(t => t.id === ohioState.id)?.fairRankScore.toFixed(1) || 'N/A'}`);
-                }
-            } else {
-                console.warn('⚠️ Ohio State not found in allTeams list!');
-            }
 
             setTeams(fairRankedTeams);
         }
