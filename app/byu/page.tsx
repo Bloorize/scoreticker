@@ -64,6 +64,11 @@ interface Game {
         status: 'winning' | 'losing' | 'won' | 'lost' | 'tied' | 'pending';
         importance: number;
     };
+    // ESPN Prediction Data
+    prediction?: {
+        homeWinProbability: number;
+        awayWinProbability: number;
+    };
 }
 
 // --- Rooting Logic ---
@@ -100,6 +105,7 @@ const ByuPage = () => {
     const [currentGameIndex, setCurrentGameIndex] = useState(0);
     const [slotsPerPage, setSlotsPerPage] = useState(4);
     const [mobileView, setMobileView] = useState<'game' | 'guide'>('game');
+    const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -269,6 +275,74 @@ const ByuPage = () => {
                         importance: matchup.priority
                     };
                 }
+
+                // Extract prediction data if available
+                // NOTE: ESPN's scoreboard API does NOT include prediction data
+                // We'll calculate probabilities based on team records/rankings as a fallback
+                let prediction = undefined;
+                
+                // First, try to get ESPN's actual predictor data (if it exists)
+                if (competition.predictor) {
+                    const predictor = competition.predictor;
+                    if (predictor.awayTeam && predictor.homeTeam) {
+                        prediction = {
+                            awayWinProbability: predictor.awayTeam.winPercentage || 0,
+                            homeWinProbability: predictor.homeTeam.winPercentage || 0,
+                        };
+                    } else if (predictor.awayTeamOdds && predictor.homeTeamOdds) {
+                        const awayOdds = predictor.awayTeamOdds;
+                        const homeOdds = predictor.homeTeamOdds;
+                        const total = awayOdds + homeOdds;
+                        if (total > 0) {
+                            prediction = {
+                                awayWinProbability: (awayOdds / total) * 100,
+                                homeWinProbability: (homeOdds / total) * 100,
+                            };
+                        }
+                    }
+                } else {
+                    // Fallback: Calculate probabilities based on team records and rankings
+                    // Parse win-loss records (format: "W-L" or "W-L-T")
+                    const parseRecord = (record: string | undefined): number => {
+                        if (!record) return 0.5; // Default to 50% if no record
+                        const parts = record.split('-');
+                        if (parts.length < 2) return 0.5;
+                        const wins = parseInt(parts[0]) || 0;
+                        const losses = parseInt(parts[1]) || 0;
+                        const total = wins + losses;
+                        return total > 0 ? wins / total : 0.5;
+                    };
+
+                    const awayWinRate = parseRecord(awayTeam.record);
+                    const homeWinRate = parseRecord(homeTeam.record);
+                    
+                    // Factor in rankings (lower rank number = better team)
+                    let awayRankBonus = 0;
+                    let homeRankBonus = 0;
+                    if (awayTeam.rank && homeTeam.rank) {
+                        // Rank difference affects probability
+                        const rankDiff = homeTeam.rank - awayTeam.rank;
+                        awayRankBonus = rankDiff * 0.02; // 2% per rank difference
+                        homeRankBonus = -rankDiff * 0.02;
+                    } else if (awayTeam.rank && !homeTeam.rank) {
+                        awayRankBonus = 0.1; // Ranked team gets 10% bonus
+                    } else if (homeTeam.rank && !awayTeam.rank) {
+                        homeRankBonus = 0.1;
+                    }
+
+                    // Combine win rate and rank bonus
+                    const awayStrength = awayWinRate + awayRankBonus;
+                    const homeStrength = homeWinRate + homeRankBonus;
+                    const totalStrength = awayStrength + homeStrength;
+
+                    if (totalStrength > 0) {
+                        prediction = {
+                            awayWinProbability: (awayStrength / totalStrength) * 100,
+                            homeWinProbability: (homeStrength / totalStrength) * 100,
+                        };
+                    }
+                }
+
                 return {
                     id: event.id,
                     name: event.name,
@@ -292,7 +366,8 @@ const ByuPage = () => {
                     away: awayTeam,
                     leaders,
                     alert,
-                    rootingInterest
+                    rootingInterest,
+                    prediction
                 };
             });
 
@@ -396,6 +471,20 @@ const ByuPage = () => {
         setIsGameLocked(prev => !prev);
     };
 
+    const navigateToPreviousGame = () => {
+        if (games.length === 0) return;
+        const prevIndex = currentGameIndex > 0 ? currentGameIndex - 1 : games.length - 1;
+        setCurrentGameIndex(prevIndex);
+        setSelectedGameId(games[prevIndex].id);
+    };
+
+    const navigateToNextGame = () => {
+        if (games.length === 0) return;
+        const nextIndex = (currentGameIndex + 1) % games.length;
+        setCurrentGameIndex(nextIndex);
+        setSelectedGameId(games[nextIndex].id);
+    };
+
     const nextTickerPage = () => {
         setTickerPage(prev => {
             const totalPages = Math.ceil(games.length / slotsPerPage);
@@ -416,23 +505,49 @@ const ByuPage = () => {
         <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 text-gray-900 font-sans overflow-hidden">
 
             {/* Main Feature Area */}
-            <main className="flex-1 relative overflow-hidden flex flex-col">
+            <main className="flex-1 relative overflow-y-auto sm:overflow-hidden flex flex-col min-h-0">
 
                 {/* Header Overlay */}
-                <header className="absolute top-0 w-full z-20 p-3 sm:p-4 md:p-6 flex flex-wrap justify-between items-start gap-3 sm:gap-4 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm h-auto">
-                    <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                <header className="absolute top-0 w-full z-20 p-2 sm:p-2.5 md:p-3 flex flex-wrap justify-between items-center gap-2 sm:gap-3 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-1 min-w-0">
                         {/* BYU Logo */}
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/50 p-1">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/50 p-1 flex-shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/logo1.png" alt="BYU" className="w-full h-full object-contain" />
                         </div>
-                        <div>
-                            <h1 className="text-lg sm:text-xl md:text-2xl font-black italic tracking-tighter text-[#0062B8]">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
-                            <p className="text-[10px] sm:text-xs text-gray-600 font-medium tracking-widest uppercase">Road to the CFP</p>
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-sm sm:text-lg md:text-xl font-black italic tracking-tighter text-[#0062B8] leading-tight">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
+                            <p className="text-[9px] sm:text-[10px] text-gray-600 font-medium tracking-widest uppercase leading-tight">Road to the CFP</p>
+                        </div>
+                        
+                        {/* Mobile View Toggle Button - In Header */}
+                        <div className="sm:hidden flex-shrink-0 ml-1">
+                            <div className="bg-white/90 backdrop-blur-xl rounded-full px-2 py-1 shadow-lg border border-white/40 flex items-center gap-1">
+                                <button
+                                    onClick={() => setMobileView('game')}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                                        mobileView === 'game' 
+                                            ? 'bg-[#0062B8] text-white shadow-md' 
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    Game
+                                </button>
+                                <button
+                                    onClick={() => setMobileView('guide')}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                                        mobileView === 'guide' 
+                                            ? 'bg-[#0062B8] text-white shadow-md' 
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    Guide
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                         <div className="hidden sm:flex flex-col items-end text-right">
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
                             <span className="text-[10px] sm:text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
@@ -443,42 +558,16 @@ const ByuPage = () => {
                     </div>
                 </header>
 
-                {/* Mobile View Toggle Button */}
-                <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-30 sm:hidden">
-                    <div className="bg-white/90 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg border border-white/40 flex items-center gap-2">
-                        <button
-                            onClick={() => setMobileView('game')}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                mobileView === 'game' 
-                                    ? 'bg-[#0062B8] text-white shadow-md' 
-                                    : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                        >
-                            Game
-                        </button>
-                        <button
-                            onClick={() => setMobileView('guide')}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                mobileView === 'guide' 
-                                    ? 'bg-[#0062B8] text-white shadow-md' 
-                                    : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                        >
-                            Guide
-                        </button>
-                    </div>
-                </div>
-
                 {/* Content Grid: Main Game + Sidebar */}
-                <div className="flex-1 flex flex-col sm:flex-row overflow-y-auto sm:overflow-hidden min-h-0">
+                <div className="flex-1 flex flex-col sm:flex-row overflow-visible sm:overflow-hidden min-h-0">
 
                     {/* Left: Main Game Display */}
-                    <div className={`flex-1 flex flex-col items-center justify-center p-3 sm:p-4 md:p-6 pb-4 sm:pb-24 relative z-10 pt-32 sm:pt-28 md:pt-36 min-h-0 flex-shrink-0 ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
+                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-24 md:pt-24 min-h-0 flex-shrink-0 overflow-visible ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
                         {activeGame ? (
                             <div className="w-full max-w-5xl flex flex-col items-center animate-in fade-in duration-700">
 
                                 {/* Rooting Context Badge */}
-                                <div className="mb-4 sm:mb-6 md:mb-8 flex items-center gap-2 sm:gap-3 z-30 w-full max-w-5xl px-2">
+                                <div className="mb-2 sm:mb-3 md:mb-4 flex items-center gap-2 sm:gap-3 z-30 w-full max-w-5xl px-2">
                                     <div className="bg-[#0062B8]/90 backdrop-blur-xl px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-xl sm:rounded-2xl border border-white/30 shadow-xl flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                         <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-widest flex-shrink-0">We Want:</span>
                                         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -509,12 +598,23 @@ const ByuPage = () => {
                                     </button>
                                 </div>
 
-                                {/* Scoreboard */}
-                                <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6 md:gap-8 lg:gap-16 px-2">
+                                {/* Scoreboard with Navigation Arrows */}
+                                <div className="w-full max-w-4xl relative">
+                                    {/* Left Arrow */}
+                                    <button
+                                        onClick={navigateToPreviousGame}
+                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 sm:-translate-x-8 md:-translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                                        title="Previous game"
+                                    >
+                                        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#0062B8] group-hover:text-[#002E5D] transition-colors" />
+                                    </button>
+
+                                    {/* Scoreboard */}
+                                    <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6 md:gap-8 lg:gap-16 px-2">
                                     <BigTeamDisplay team={activeGame.away} isOpponentWinner={activeGame.home.isWinner} align="right" />
 
                                     <div className="flex flex-col items-center gap-2 sm:gap-4">
-                                        <div className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-black text-gray-300/40 italic select-none">VS</div>
+                                        <div className="text-xl sm:text-2xl md:text-3xl lg:text-5xl font-black text-gray-300/40 italic select-none">VS</div>
                                         {activeGame.isLive && activeGame.situation.downDistanceText && (
                                             <div className="flex flex-col items-center bg-[#002E5D]/90 backdrop-blur-xl rounded-xl sm:rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 border border-white/20 shadow-xl">
                                                 <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white font-mono tracking-tight">
@@ -525,49 +625,136 @@ const ByuPage = () => {
                                     </div>
 
                                     <BigTeamDisplay team={activeGame.home} isOpponentWinner={activeGame.away.isWinner} align="left" />
+                                    </div>
+
+                                    {/* Right Arrow */}
+                                    <button
+                                        onClick={navigateToNextGame}
+                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 sm:translate-x-8 md:translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                                        title="Next game"
+                                    >
+                                        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#0062B8] group-hover:text-[#002E5D] transition-colors" />
+                                    </button>
                                 </div>
 
-                                {/* Game Details / Last Play / Leaders */}
-                                <div className="mt-6 sm:mt-8 md:mt-12 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 px-2">
-                                    <div className="space-y-3 sm:space-y-4">
-                                        <div className="flex items-center justify-center gap-2 text-gray-700 text-xs sm:text-sm font-medium">
-                                            <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
-                                            <span className="text-center">{activeGame.venue}</span>
+                                {/* Stadium/Venue Info - Moved Up */}
+                                <div className="mt-6 sm:mt-8 md:mt-12 max-w-4xl w-full px-2 mb-4 sm:mb-6">
+                                    <div className="flex items-center justify-center gap-2 text-gray-700 text-xs sm:text-sm font-medium">
+                                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
+                                        <span className="text-center">{activeGame.venue}</span>
+                                    </div>
+                                    {activeGame.situation?.lastPlay && (
+                                        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center shadow-lg mt-4 max-w-md mx-auto">
+                                            <div className="flex items-center justify-center gap-2 mb-1">
+                                                <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
+                                                <span className="text-[10px] sm:text-xs font-bold text-[#0062B8] uppercase tracking-wider">Last Play</span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-medium">"{activeGame.situation.lastPlay}"</p>
                                         </div>
-                                        {activeGame.situation?.lastPlay && (
-                                            <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center shadow-lg">
-                                                <div className="flex items-center justify-center gap-2 mb-1">
-                                                    <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
-                                                    <span className="text-[10px] sm:text-xs font-bold text-[#0062B8] uppercase tracking-wider">Last Play</span>
+                                    )}
+                                </div>
+
+                                {/* Matchup Predictor & Game Leaders - Side by Side */}
+                                <div className="mt-0 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 px-2 pb-20 sm:pb-28 md:pb-36 overflow-visible">
+                                    {/* Matchup Predictor */}
+                                    {activeGame.prediction ? (
+                                        <MatchupPredictor game={activeGame} />
+                                    ) : (
+                                        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex items-center justify-center">
+                                            <p className="text-[10px] sm:text-xs text-gray-500 text-center">No prediction data available</p>
+                                        </div>
+                                    )}
+
+                                    {/* Leaders Module */}
+                                    <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col">
+                                        <div className="mb-2 flex-shrink-0">
+                                            <h3 className="text-[9px] sm:text-[10px] font-bold text-[#002E5D] uppercase tracking-widest mb-1.5 border-b border-gray-200/50 pb-1 sm:pb-1.5">Game Leaders</h3>
+                                            
+                                            {/* Team Filter Toggle */}
+                                            {activeGame.leaders && activeGame.leaders.length > 0 && (
+                                                <div className="flex gap-1 mt-1.5 bg-white/40 backdrop-blur-sm rounded-lg p-0.5 border border-white/30">
+                                                    <button
+                                                        onClick={() => setLeadersView('all')}
+                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                            leadersView === 'all'
+                                                                ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                : 'text-gray-600 hover:bg-white/60'
+                                                        }`}
+                                                    >
+                                                        All
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setLeadersView('away')}
+                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                            leadersView === 'away'
+                                                                ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                : 'text-gray-600 hover:bg-white/60'
+                                                        }`}
+                                                    >
+                                                        {activeGame.away.shortName}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setLeadersView('home')}
+                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                            leadersView === 'home'
+                                                                ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                : 'text-gray-600 hover:bg-white/60'
+                                                        }`}
+                                                    >
+                                                        {activeGame.home.shortName}
+                                                    </button>
                                                 </div>
-                                                <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-medium">"{activeGame.situation.lastPlay}"</p>
+                                            )}
+                                        </div>
+                                        
+                                        {activeGame.leaders && activeGame.leaders.length > 0 ? (
+                                            <div className="space-y-1.5 sm:space-y-2 flex-1 overflow-y-auto">
+                                                {(() => {
+                                                    // Filter leaders based on selected view
+                                                    let filteredLeaders = activeGame.leaders;
+                                                    if (leadersView === 'away') {
+                                                        filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.away.id);
+                                                    } else if (leadersView === 'home') {
+                                                        filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.home.id);
+                                                    }
+                                                    
+                                                    // Group by category and take top from each
+                                                    const categories = ['Passing', 'Rushing', 'Receiving'];
+                                                    const displayedLeaders: typeof activeGame.leaders = [];
+                                                    
+                                                    categories.forEach(cat => {
+                                                        const leader = filteredLeaders.find(l => l.name.toLowerCase().includes(cat.toLowerCase()));
+                                                        if (leader) displayedLeaders.push(leader);
+                                                    });
+                                                    
+                                                    // If no category match, just show first 3
+                                                    if (displayedLeaders.length === 0) {
+                                                        displayedLeaders.push(...filteredLeaders.slice(0, 3));
+                                                    }
+                                                    
+                                                    return displayedLeaders.map((leader, i) => (
+                                                        <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                                                            {leader.athlete.headshot ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img src={leader.athlete.headshot} alt="" className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
+                                                            ) : (
+                                                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[8px] sm:text-[9px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-[11px] sm:text-xs font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
+                                                                <div className="text-[9px] sm:text-[10px] text-gray-600 truncate">{leader.name}</div>
+                                                            </div>
+                                                            <div className="text-[11px] sm:text-xs font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
+                                                        </div>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1 flex items-center justify-center">
+                                                <p className="text-[10px] sm:text-xs text-gray-500 text-center">No leader data available</p>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Leaders Module */}
-                                    {activeGame.leaders && activeGame.leaders.length > 0 && (
-                                        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/40 shadow-lg">
-                                            <h3 className="text-[10px] sm:text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-2 sm:mb-3 border-b border-gray-200/50 pb-1.5 sm:pb-2">Game Leaders</h3>
-                                            <div className="space-y-2 sm:space-y-3">
-                                                {activeGame.leaders.slice(0, 3).map((leader, i) => (
-                                                    <div key={i} className="flex items-center gap-2 sm:gap-3">
-                                                        {leader.athlete.headshot ? (
-                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                            <img src={leader.athlete.headshot} alt="" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
-                                                        ) : (
-                                                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[9px] sm:text-[10px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
-                                                        )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs sm:text-sm font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
-                                                            <div className="text-[10px] sm:text-xs text-gray-600 truncate">{leader.name}</div>
-                                                        </div>
-                                                        <div className="text-xs sm:text-sm font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -716,8 +903,8 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
     const isLoser = isOpponentWinner;
 
     return (
-        <div className={`flex flex-col gap-2 sm:gap-3 md:gap-4 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-            <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 p-2 sm:p-3 md:p-4 bg-white/70 backdrop-blur-xl rounded-full border ${isWinner ? 'border-[#0062B8]/50 shadow-xl' : 'border-white/50'} shadow-lg`}>
+        <div className={`flex flex-col gap-1.5 sm:gap-2 md:gap-3 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+            <div className={`relative w-14 h-14 sm:w-18 sm:h-18 md:w-20 md:h-20 lg:w-28 lg:h-28 p-2 sm:p-2.5 md:p-3 bg-white/70 backdrop-blur-xl rounded-full border ${isWinner ? 'border-[#0062B8]/50 shadow-xl' : 'border-white/50'} shadow-lg`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={team.logo} alt={team.name} className={`w-full h-full object-contain drop-shadow-lg ${isLoser ? 'grayscale opacity-70' : ''}`} />
                 {team.hasBall && (
@@ -730,13 +917,13 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
             <div className="space-y-0.5 sm:space-y-1">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                     {align === 'left' && team.rank && <RankBadge rank={team.rank} />}
-                    <h2 className="text-lg sm:text-xl md:text-2xl lg:text-4xl font-black text-[#002E5D] tracking-tight leading-none">{team.shortName}</h2>
+                    <h2 className="text-base sm:text-lg md:text-xl lg:text-3xl font-black text-[#002E5D] tracking-tight leading-none">{team.shortName}</h2>
                     {align === 'right' && team.rank && <RankBadge rank={team.rank} />}
                 </div>
-                <p className="text-sm sm:text-base md:text-lg text-gray-600 font-medium">{team.record || '0-0'}</p>
+                <p className="text-xs sm:text-sm md:text-base text-gray-600 font-medium">{team.record || '0-0'}</p>
             </div>
 
-            <div className={`text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black font-mono tracking-tighter ${isWinner ? 'text-[#0062B8]' : 'text-[#002E5D]'}`}>
+            <div className={`text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-black font-mono tracking-tighter ${isWinner ? 'text-[#0062B8]' : 'text-[#002E5D]'}`}>
                 {team.score || '0'}
             </div>
         </div>
@@ -766,5 +953,89 @@ const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: bo
 const RankBadge = ({ rank }: { rank: number }) => (
     <span className="bg-[#002E5D]/90 backdrop-blur-md text-white text-[8px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-lg leading-none border border-white/20 shadow-sm">{rank}</span>
 );
+
+// Matchup Predictor Component
+const MatchupPredictor = ({ game }: { game: Game }) => {
+    if (!game.prediction) return null;
+
+    const awayProb = game.prediction.awayWinProbability;
+    const homeProb = game.prediction.homeWinProbability;
+    const awayAngle = (awayProb / 100) * 360;
+    const homeAngle = (homeProb / 100) * 360;
+    
+    // Use team colors, with fallback to default colors
+    const awayColor = game.away.color || '#0062B8';
+    const homeColor = game.home.color || '#002E5D';
+
+    return (
+        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col overflow-visible">
+            <h3 className="text-[9px] sm:text-[10px] font-bold text-[#002E5D] uppercase tracking-widest mb-2 sm:mb-3 text-center flex-shrink-0">MATCHUP PREDICTOR</h3>
+            
+            {/* Circular Chart */}
+            <div className="relative w-full aspect-square max-w-[140px] sm:max-w-[150px] md:max-w-[170px] mx-auto mb-2 sm:mb-3 flex-shrink-0 overflow-visible">
+                <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
+                    {/* Away Team (Left Half) */}
+                    <circle
+                        cx="100"
+                        cy="100"
+                        r="90"
+                        fill="none"
+                        stroke={awayColor}
+                        strokeWidth="20"
+                        strokeDasharray={`${awayAngle * Math.PI / 180 * 90} ${360 * Math.PI / 180 * 90}`}
+                        className="transition-all duration-500"
+                    />
+                    {/* Home Team (Right Half) */}
+                    <circle
+                        cx="100"
+                        cy="100"
+                        r="90"
+                        fill="none"
+                        stroke={homeColor}
+                        strokeWidth="20"
+                        strokeDasharray={`${homeAngle * Math.PI / 180 * 90} ${360 * Math.PI / 180 * 90}`}
+                        strokeDashoffset={`-${awayAngle * Math.PI / 180 * 90}`}
+                        className="transition-all duration-500"
+                    />
+                </svg>
+                
+                {/* Team Logos in Center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex items-center gap-1.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={game.away.logo} alt={game.away.shortName} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={game.home.logo} alt={game.home.shortName} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Percentages */}
+            <div className="flex justify-between items-center gap-1.5 mb-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-1">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: awayColor }}></div>
+                    <div className="flex flex-col min-w-0">
+                        <div className="text-base sm:text-lg font-black text-gray-900">{awayProb.toFixed(1)}%</div>
+                        <div className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase truncate">{game.away.shortName}</div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1 flex-1 justify-end">
+                    <div className="flex flex-col items-end min-w-0">
+                        <div className="text-base sm:text-lg font-black text-gray-900">{homeProb.toFixed(1)}%</div>
+                        <div className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase truncate">{game.home.shortName}</div>
+                    </div>
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: homeColor }}></div>
+                </div>
+            </div>
+
+            {/* Source */}
+            <div className="text-[8px] sm:text-[9px] text-gray-500 text-center italic flex-shrink-0 mt-auto">
+                {game.prediction?.awayWinProbability && game.prediction?.homeWinProbability 
+                    ? 'Calculated from team records & rankings'
+                    : 'According to ESPN Analytics'}
+            </div>
+        </div>
+    );
+};
 
 export default ByuPage;

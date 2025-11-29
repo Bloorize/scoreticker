@@ -262,6 +262,20 @@ const App = () => {
     setIsGameLocked(prev => !prev);
   };
 
+  const navigateToPreviousGame = () => {
+    if (games.length === 0) return;
+    const prevIndex = currentGameIndex > 0 ? currentGameIndex - 1 : games.length - 1;
+    setCurrentGameIndex(prevIndex);
+    setSelectedGameId(games[prevIndex].id);
+  };
+
+  const navigateToNextGame = () => {
+    if (games.length === 0) return;
+    const nextIndex = (currentGameIndex + 1) % games.length;
+    setCurrentGameIndex(nextIndex);
+    setSelectedGameId(games[nextIndex].id);
+  };
+
   const nextTickerPage = () => {
     setTickerPage(prev => {
       const totalPages = Math.ceil(games.length / slotsPerPage);
@@ -343,8 +357,19 @@ const App = () => {
               </button>
             </div>
 
-            {/* Scoreboard */}
-            <div className="w-full max-w-4xl grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6 md:gap-8 lg:gap-16 px-2">
+            {/* Scoreboard with Navigation Arrows */}
+            <div className="w-full max-w-4xl relative">
+              {/* Left Arrow */}
+              <button
+                onClick={navigateToPreviousGame}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 sm:-translate-x-8 md:-translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                title="Previous game"
+              >
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-blue-600 group-hover:text-blue-800 transition-colors" />
+              </button>
+
+              {/* Scoreboard */}
+              <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6 md:gap-8 lg:gap-16 px-2">
 
               {/* Away Team */}
               <BigTeamDisplay team={activeGame.away} isOpponentWinner={activeGame.home.isWinner} align="right" />
@@ -366,7 +391,16 @@ const App = () => {
 
               {/* Home Team */}
               <BigTeamDisplay team={activeGame.home} isOpponentWinner={activeGame.away.isWinner} align="left" />
+              </div>
 
+              {/* Right Arrow */}
+              <button
+                onClick={navigateToNextGame}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 sm:translate-x-8 md:translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                title="Next game"
+              >
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-blue-600 group-hover:text-blue-800 transition-colors" />
+              </button>
             </div>
 
             {/* Game Details / Last Play / Leaders */}
