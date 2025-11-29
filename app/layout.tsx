@@ -51,6 +51,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* Google AdSense - Must be in head for verification */}
+        <Script
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2568418773305987"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
+        />
         {/* Google Analytics */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-85RYBJ651R"
@@ -64,13 +70,6 @@ export default function RootLayout({
             gtag('config', 'G-85RYBJ651R');
           `}
         </Script>
-        
-        {/* Google AdSense */}
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2568418773305987"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
         
         {children}
       </body>
