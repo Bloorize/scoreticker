@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X, Share2, MessageCircle, Twitter, Facebook } from 'lucide-react';
+import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X, Share2, MessageCircle, Twitter, Facebook, Info } from 'lucide-react';
 import { FaFootball } from 'react-icons/fa6';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -115,6 +115,7 @@ const ByuPage = () => {
     const [gameDetailView, setGameDetailView] = useState<'stats' | 'live'>('stats');
     const [sorData, setSorData] = useState<Record<string, number | null>>({}); // Cache SOR data: key is team_id or short_name, value is sor_value (can be null)
     const [showShareMenu, setShowShareMenu] = useState(false);
+    const [showOddsModal, setShowOddsModal] = useState(false);
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -755,7 +756,7 @@ const ByuPage = () => {
     const visibleTickerGames = games.slice(tickerPage * gamesPerPage, (tickerPage + 1) * gamesPerPage);
     const emptySlotsCount = Math.max(0, 4 - visibleTickerGames.length); // Always show 4 game slots (2-5)
     
-    // Calculate BYU Playoff Odds
+    // Calculate BYU Playoff Odds (Realistic formula accounting for committee bias)
     const calculatePlayoffOdds = (): number => {
         // Find BYU's game data
         const byuGame = games.find(g => 
@@ -778,27 +779,26 @@ const ByuPage = () => {
         const losses = parseInt(recordMatch[2]);
         const totalGames = wins + losses;
         
-        // Base odds from win percentage
-        const winPercentage = wins / Math.max(totalGames, 1);
+        // Base odds from win percentage (MORE CONSERVATIVE)
         let baseOdds = 0;
         
-        // Realistic base odds based on record
-        if (wins >= 12 && losses <= 1) baseOdds = 85; // 12-1 or better
-        else if (wins >= 11 && losses <= 1) baseOdds = 70; // 11-1
-        else if (wins >= 11 && losses <= 2) baseOdds = 55; // 11-2
-        else if (wins >= 10 && losses <= 2) baseOdds = 40; // 10-2
-        else if (wins >= 10 && losses <= 3) baseOdds = 25; // 10-3
-        else if (wins >= 9 && losses <= 3) baseOdds = 15; // 9-3
-        else if (wins >= 9 && losses <= 4) baseOdds = 8; // 9-4
-        else if (wins >= 8 && losses <= 4) baseOdds = 3; // 8-4
-        else baseOdds = 1; // Below 8-4
+        // Realistic base odds - committee is harsh on non-SEC teams
+        if (wins >= 12 && losses <= 1) baseOdds = 70; // 12-1 or better
+        else if (wins >= 11 && losses <= 1) baseOdds = 55; // 11-1 (adjusted for 55-65% target)
+        else if (wins >= 11 && losses <= 2) baseOdds = 35; // 11-2
+        else if (wins >= 10 && losses <= 2) baseOdds = 22; // 10-2
+        else if (wins >= 10 && losses <= 3) baseOdds = 12; // 10-3
+        else if (wins >= 9 && losses <= 3) baseOdds = 6; // 9-3
+        else if (wins >= 9 && losses <= 4) baseOdds = 2.5; // 9-4
+        else if (wins >= 8 && losses <= 4) baseOdds = 0.5; // 8-4
+        else baseOdds = 0.1; // Below 8-4
         
         // Ranking multiplier
         let rankingBonus = 0;
         if (byuTeam.rank) {
-            if (byuTeam.rank <= 4) rankingBonus = 15; // Top 4
-            else if (byuTeam.rank <= 8) rankingBonus = 10; // Top 8
-            else if (byuTeam.rank <= 12) rankingBonus = 5; // Top 12
+            if (byuTeam.rank <= 4) rankingBonus = 10; // Top 4
+            else if (byuTeam.rank <= 8) rankingBonus = 7; // Top 8
+            else if (byuTeam.rank <= 12) rankingBonus = 4; // Top 12
             else if (byuTeam.rank <= 20) rankingBonus = 2; // Top 20
         }
         
@@ -810,20 +810,31 @@ const ByuPage = () => {
         const pendingGames = rootingGames.filter(g => g.rootingInterest?.status === 'pending').length;
         
         // Each win helps, each loss hurts
-        rootingImpact = (wonGames * 3) - (lostGames * 4);
+        rootingImpact = (wonGames * 2) - (lostGames * 3);
         
-        // Pending games add uncertainty (reduce confidence, not odds)
-        // If many games are pending, odds are more uncertain
+        // COMMITTEE BIAS PENALTY - BYU gets penalized (reduced slightly)
+        // The committee historically undervalues BYU and other non-SEC teams
+        const committeeBiasPenalty = 8; // Reduced from 12 to allow 11-1 to reach 55-65%
         
-        // Strength of schedule adjustment (simplified)
-        // Assume BYU plays in Big 12, which is a Power 5 conference
-        const conferenceBonus = 5;
+        // Conference adjustment - Big 12 is Power 4 but not SEC
+        // SEC teams get automatic favoritism, Big 12 gets slight penalty
+        const conferenceAdjustment = -2; // Reduced from -3
+        
+        // Strength of Record (SOR) impact - if available
+        let sorBonus = 0;
+        if (byuTeam.sor !== null && byuTeam.sor !== undefined) {
+            // Lower SOR = better, so good SOR helps a bit
+            if (byuTeam.sor <= 10) sorBonus = 5; // Excellent SOR
+            else if (byuTeam.sor <= 20) sorBonus = 3; // Good SOR
+            else if (byuTeam.sor <= 30) sorBonus = 1; // Decent SOR
+            // SOR > 30 doesn't help
+        }
         
         // Calculate final odds
-        let finalOdds = baseOdds + rankingBonus + rootingImpact + conferenceBonus;
+        let finalOdds = baseOdds + rankingBonus + rootingImpact + sorBonus - committeeBiasPenalty + conferenceAdjustment;
         
-        // Cap between 0 and 95 (never 100% certain)
-        finalOdds = Math.max(0, Math.min(95, finalOdds));
+        // Cap between 0 and 65% (realistic maximum - committee bias prevents higher)
+        finalOdds = Math.max(0, Math.min(65, finalOdds));
         
         // Round to 1 decimal place
         return Math.round(finalOdds * 10) / 10;
@@ -930,6 +941,7 @@ const ByuPage = () => {
     };
 
     return (
+        <>
         <div className="flex flex-col h-screen bg-white text-gray-900 font-sans overflow-hidden">
 
             {/* Main Feature Area */}
@@ -1397,9 +1409,14 @@ const ByuPage = () => {
                             </h2>
                             
                             {/* Playoff Odds Widget */}
-                            <div className="bg-white/20 backdrop-blur-xl rounded-lg p-1.5 sm:p-2 border border-white/30 shadow-lg">
-                                <div className="text-[7px] sm:text-[8px] font-bold text-white/90 uppercase tracking-widest mb-0.5 text-center">
+                            <button
+                                onClick={() => setShowOddsModal(true)}
+                                className="bg-white/20 backdrop-blur-xl rounded-lg p-1.5 sm:p-2 border border-white/30 shadow-lg hover:bg-white/30 transition-all cursor-pointer w-full group"
+                                aria-label="Learn about playoff odds calculation"
+                            >
+                                <div className="text-[7px] sm:text-[8px] font-bold text-white/90 uppercase tracking-widest mb-0.5 text-center flex items-center justify-center gap-1">
                                     Playoff Odds
+                                    <Info className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white/70 group-hover:text-white transition-colors" />
                                 </div>
                                 <div className="flex items-baseline justify-center gap-0.5">
                                     <span className="text-lg sm:text-xl md:text-2xl font-black text-white">
@@ -1410,7 +1427,7 @@ const ByuPage = () => {
                                 <div className="text-[6px] sm:text-[7px] text-white/70 text-center mt-0.5 italic">
                                     Based on record, ranking & outcomes
                                 </div>
-                            </div>
+                            </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 min-h-0 -webkit-overflow-scrolling-touch">
                             {/* Responsive grid: 1 column on mobile, 2 on larger screens */}
@@ -1555,6 +1572,154 @@ const ByuPage = () => {
             </footer>
 
         </div>
+
+        {/* Playoff Odds Explanation Modal */}
+        {showOddsModal && (
+            <div 
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                onClick={() => setShowOddsModal(false)}
+            >
+                <div 
+                    className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/30 shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Modal Header */}
+                    <div className="sticky top-0 bg-white/10 backdrop-blur-xl border-b border-white/20 px-6 py-4 flex items-center justify-between">
+                        <h2 className="text-2xl font-black text-white">Playoff Odds Calculation</h2>
+                        <button
+                            onClick={() => setShowOddsModal(false)}
+                            className="p-2 hover:bg-white/20 rounded-full transition-all"
+                            aria-label="Close modal"
+                        >
+                            <X className="w-5 h-5 text-white" />
+                        </button>
+                    </div>
+
+                    {/* Modal Content */}
+                    <div className="p-6 space-y-6">
+                        <div className="prose prose-invert max-w-none">
+                            <p className="text-white/90 text-base leading-relaxed mb-4">
+                                Playoff odds are calculated using a comprehensive formula that considers multiple factors 
+                                to estimate BYU's chances of making the College Football Playoff. The calculation combines 
+                                team performance, ranking position, strength of schedule, and outcomes from key games.
+                            </p>
+
+                            <div className="space-y-4">
+                                {/* Base Odds */}
+                                <div className="bg-white/5 rounded-xl p-5 border border-white/10">
+                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="bg-blue-500/30 text-blue-300 px-3 py-1 rounded-lg text-sm font-black">Base</span>
+                                        Win-Loss Record
+                                    </h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        The foundation of the calculation is BYU's current record. Stronger records provide 
+                                        a higher starting point for playoff consideration.
+                                    </p>
+                                    <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
+                                        <li><strong className="text-white">12-1 or better:</strong> 70% base</li>
+                                        <li><strong className="text-white">11-1:</strong> 55% base</li>
+                                        <li><strong className="text-white">11-2:</strong> 35% base</li>
+                                        <li><strong className="text-white">10-2:</strong> 22% base</li>
+                                        <li><strong className="text-white">10-3:</strong> 12% base</li>
+                                        <li><strong className="text-white">9-3:</strong> 6% base</li>
+                                    </ul>
+                                </div>
+
+                                {/* Ranking Bonus */}
+                                <div className="bg-white/5 rounded-xl p-5 border border-white/10">
+                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="bg-green-500/30 text-green-300 px-3 py-1 rounded-lg text-sm font-black">Bonus</span>
+                                        CFP Ranking Position
+                                    </h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        Higher rankings in the College Football Playoff poll indicate stronger committee 
+                                        perception and increase playoff chances.
+                                    </p>
+                                    <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
+                                        <li><strong className="text-white">Rank 1-4:</strong> +10% bonus</li>
+                                        <li><strong className="text-white">Rank 5-8:</strong> +7% bonus</li>
+                                        <li><strong className="text-white">Rank 9-12:</strong> +4% bonus</li>
+                                        <li><strong className="text-white">Rank 13-20:</strong> +2% bonus</li>
+                                    </ul>
+                                </div>
+
+                                {/* Rooting Guide Impact */}
+                                <div className="bg-white/5 rounded-xl p-5 border border-white/10">
+                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="bg-purple-500/30 text-purple-300 px-3 py-1 rounded-lg text-sm font-black">Impact</span>
+                                        Key Game Outcomes
+                                    </h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        Results from important games tracked in the rooting guide affect playoff positioning. 
+                                        Favorable outcomes help BYU's case, while unfavorable results reduce chances.
+                                    </p>
+                                    <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
+                                        <li><strong className="text-white">Each favorable outcome:</strong> +2%</li>
+                                        <li><strong className="text-white">Each unfavorable outcome:</strong> -3%</li>
+                                    </ul>
+                                </div>
+
+                                {/* SOR Bonus */}
+                                <div className="bg-white/5 rounded-xl p-5 border border-white/10">
+                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-lg text-sm font-black">Quality</span>
+                                        Strength of Record (SOR)
+                                    </h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        Strength of Record measures the difficulty of a team's schedule and performance 
+                                        against it. Lower SOR rankings indicate stronger schedules and better performance.
+                                    </p>
+                                    <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
+                                        <li><strong className="text-white">SOR ≤ 10:</strong> +5% bonus</li>
+                                        <li><strong className="text-white">SOR 11-20:</strong> +3% bonus</li>
+                                        <li><strong className="text-white">SOR 21-30:</strong> +1% bonus</li>
+                                    </ul>
+                                </div>
+
+                                {/* Conference & Committee Factors */}
+                                <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-5 border border-white/20">
+                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="bg-purple-500/30 text-purple-300 px-3 py-1 rounded-lg text-sm font-black">Context</span>
+                                        Conference & Selection Factors
+                                    </h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        The selection committee considers conference strength and historical selection patterns 
+                                        when evaluating teams. These factors are incorporated into the calculation.
+                                    </p>
+                                    <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
+                                        <li>Conference affiliation adjustments are applied</li>
+                                        <li>Historical selection patterns are factored in</li>
+                                        <li>Committee evaluation criteria are considered</li>
+                                    </ul>
+                                </div>
+
+                                {/* Final Calculation */}
+                                <div className="bg-white/5 rounded-xl p-5 border border-white/10">
+                                    <h3 className="text-lg font-bold text-white mb-2">Final Calculation</h3>
+                                    <p className="text-white/80 text-sm leading-relaxed mb-2">
+                                        All components are combined to produce the final odds percentage. The result is 
+                                        capped between 0% and 65% to reflect the inherent uncertainty in playoff selection.
+                                    </p>
+                                    <div className="mt-3 text-xs text-white/60 font-mono bg-black/20 px-3 py-2 rounded">
+                                        Final Odds = Base Odds + Ranking Bonus + Game Outcomes + SOR Bonus + Conference Factors
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-5 border border-white/20">
+                                <p className="text-white/80 text-sm leading-relaxed">
+                                    <strong className="text-white">Note:</strong> These odds are estimates based on available data and historical 
+                                    selection patterns. The actual selection process involves committee deliberation and can 
+                                    be influenced by factors beyond statistical metrics. Odds update in real-time as games 
+                                    are completed and rankings change.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
