@@ -896,7 +896,7 @@ const PlayoffsPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#002E5D] via-[#0062B8] to-[#002E5D] p-4 sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-[#0047BA] p-4 sm:p-6 lg:p-8">
             {/* Header */}
             <div className="max-w-7xl mx-auto mb-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -963,13 +963,32 @@ const PlayoffsPage = () => {
                     </div>
                 </div>
 
-                {/* Status Badge */}
-                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 px-4 py-2">
-                    <Trophy className="w-4 h-4 text-yellow-300" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                        {useRealRankings ? 'Current CFP Rankings' : 'Fair Rankings (Based on SOR & Performance)'}
-                    </span>
-                </div>
+                {/* Status Badge - Clickable when Fair Rankings is selected */}
+                {useRealRankings ? (
+                    <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 px-4 py-2">
+                        <Trophy className="w-4 h-4 text-yellow-300" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                            Current ESPN CFP Rankings
+                        </span>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setShowFormulaModal(true)}
+                        className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 px-4 py-2 hover:bg-white/30 transition-all cursor-pointer group"
+                        aria-label="Learn about Fair Rankings formula"
+                    >
+                        <Trophy className="w-4 h-4 text-yellow-300" />
+                        <div className="flex flex-col items-start">
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                Fair Rankings (Based on SOR & Performance)
+                            </span>
+                            <span className="text-[10px] text-white/70 group-hover:text-white/90 transition-colors">
+                                Click for details
+                            </span>
+                        </div>
+                        <Info className="w-3 h-3 text-white/70 group-hover:text-white transition-colors ml-1" />
+                    </button>
+                )}
             </div>
 
             {/* Bracket Container */}

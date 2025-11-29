@@ -195,7 +195,6 @@ const App = () => {
         }
       }
     } catch (err) {
-      console.error(err);
       setError("Unable to load scoreboard. The API might be down or blocked.");
       setLoading(false);
     }

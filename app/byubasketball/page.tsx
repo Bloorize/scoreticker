@@ -139,8 +139,6 @@ const ByuBasketballPage = () => {
             const today = new Date();
             const todayDateStr = formatDate(today);
             
-            console.log(`📅 Today's date: ${today.toLocaleDateString()} (${todayDateStr})`);
-            
             // Try multiple queries and merge results to get all games
             const allResponses: any[] = [];
             const existingIds = new Set<string>();
@@ -158,30 +156,26 @@ const ByuBasketballPage = () => {
             
             // Query 1: With today's date (includes live and completed)
             const url1 = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${todayDateStr}&limit=500`;
-            console.log('Query 1: Fetching with today\'s date:', url1);
             try {
                 const res1 = await fetch(url1);
                 if (res1.ok) {
                     const data1 = await res1.json();
-                    console.log(`Query 1 returned ${data1.events?.length || 0} games`);
                     addUniqueGames(data1.events);
                 }
             } catch (e) {
-                console.log('Query 1 failed:', e);
+                // Query 1 failed
             }
             
             // Query 2: Without date filter (ESPN defaults to today)
             const url2 = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?limit=500`;
-            console.log('Query 2: Fetching without date filter:', url2);
             try {
                 const res2 = await fetch(url2);
                 if (res2.ok) {
                     const data2 = await res2.json();
-                    console.log(`Query 2 returned ${data2.events?.length || 0} games`);
                     addUniqueGames(data2.events);
                 }
             } catch (e) {
-                console.log('Query 2 failed:', e);
+                // Query 2 failed
             }
             
             // Query 3: Try querying yesterday through today (in case games are archived)
@@ -189,34 +183,28 @@ const ByuBasketballPage = () => {
             yesterday.setDate(today.getDate() - 1);
             const yesterdayDateStr = formatDate(yesterday);
             const url3 = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${yesterdayDateStr}-${todayDateStr}&limit=500`;
-            console.log('Query 3: Fetching date range (yesterday-today):', url3);
             try {
                 const res3 = await fetch(url3);
                 if (res3.ok) {
                     const data3 = await res3.json();
-                    console.log(`Query 3 returned ${data3.events?.length || 0} games`);
                     addUniqueGames(data3.events);
                 }
             } catch (e) {
-                console.log('Query 3 failed:', e);
+                // Query 3 failed
             }
             
             // Query 4: Try with groups parameter for Big 12 (conference ID 8)
             // Some ESPN endpoints support filtering by conference/group
             const url4 = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${todayDateStr}&groups=8&limit=500`;
-            console.log('Query 4: Fetching Big 12 games (group 8):', url4);
             try {
                 const res4 = await fetch(url4);
                 if (res4.ok) {
                     const data4 = await res4.json();
-                    console.log(`Query 4 returned ${data4.events?.length || 0} games`);
                     addUniqueGames(data4.events);
                 }
             } catch (e) {
-                console.log('Query 4 failed:', e);
+                // Query 4 failed
             }
-            
-            console.log(`📊 Total unique games collected: ${allResponses.length}`);
             
             // Check if Colorado or TCU appear in any games (even if not Big 12)
             const coloradoGames = allResponses.filter((event: any) => {
@@ -240,21 +228,8 @@ const ByuBasketballPage = () => {
                 );
             });
             
-            if (coloradoGames.length > 0) {
-                console.log(`✅ Found ${coloradoGames.length} Colorado game(s) in API response`);
-            } else {
-                console.log(`⚠️  Colorado games NOT found in ESPN API response`);
-            }
-            
-            if (tcuGames.length > 0) {
-                console.log(`✅ Found ${tcuGames.length} TCU game(s) in API response`);
-            } else {
-                console.log(`⚠️  TCU games NOT found in ESPN API response`);
-            }
-            
             // Use merged events directly
             const data = { events: allResponses };
-            console.log('Games fetched:', data.events?.length || 0);
             
             // Create a map of game IDs to raw team data for conference checking
             const rawTeamDataMap = new Map<string, { home: any, away: any }>();
@@ -266,18 +241,6 @@ const ByuBasketballPage = () => {
                 rawTeamDataMap.set(event.id, { home, away });
             });
             
-            // Log all games with dates and teams from API to help debug
-            console.log('\n📋 All games in API response:');
-            (data.events || []).forEach((event: any, idx: number) => {
-                const competition = event.competitions[0];
-                const competitors = competition.competitors;
-                const home = competitors.find((c: any) => c.homeAway === 'home');
-                const away = competitors.find((c: any) => c.homeAway === 'away');
-                const gameDate = new Date(event.date);
-                console.log(`  Game ${idx + 1}: ${away.team.displayName} @ ${home.team.displayName} - Date: ${gameDate.toLocaleDateString()} ${gameDate.toLocaleTimeString()}`);
-                console.log(`    Away: ${away.team.displayName} (${away.team.shortDisplayName || away.team.abbreviation}) - Conference ID: ${away.team.conferenceId || 'N/A'}`);
-                console.log(`    Home: ${home.team.displayName} (${home.team.shortDisplayName || home.team.abbreviation}) - Conference ID: ${home.team.conferenceId || 'N/A'}`);
-            });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const allGames = (data.events || []).map((event: any) => {
@@ -339,23 +302,6 @@ const ByuBasketballPage = () => {
                     hasBall: situation.possession === away.id
                 };
 
-                // Log every game with conference info if available
-                const homeConference = home.team.conferenceId || home.team.groups?.affiliations?.[0]?.name || 'unknown';
-                const awayConference = away.team.conferenceId || away.team.groups?.affiliations?.[0]?.name || 'unknown';
-                console.log(`🏀 Game: ${awayTeam.name} (${awayTeam.shortName}) @ ${homeTeam.name} (${homeTeam.shortName})`);
-                console.log(`   Conferences: ${awayConference} @ ${homeConference}`);
-                
-                // Log leaders data
-                if (leadersData.length > 0) {
-                    console.log(`📊 Leaders data: ${leadersData.length} categories`);
-                    if (leaders.length > 0) {
-                        console.log(`   Found ${leaders.length} leader entries:`, leaders.map(l => `${l.athlete.shortName} - ${l.name}: ${l.displayValue}`).join(', '));
-                    } else {
-                        console.log(`   No leader entries found in categories`);
-                    }
-                } else {
-                    console.log(`📊 No leaders data in API response`);
-                }
 
                 // Determine Rooting Interest - check if this is a Big 12 game
                 let rootingInterest = undefined;
@@ -526,8 +472,6 @@ const ByuBasketballPage = () => {
                 const teamNameLower = team.name.toLowerCase();
                 const teamShortLower = team.shortName.toLowerCase();
                 
-                console.log(`\n🔍 Checking if "${team.name}" (${team.shortName}) is Big 12...`);
-                
                 // First, try to use conference information from ESPN if available
                 if (rawTeamData) {
                     // ESPN returns conference IDs as numbers
@@ -541,11 +485,8 @@ const ByuBasketballPage = () => {
                                          rawTeamData.team?.conference ||
                                          rawTeamData.conference;
                     
-                    console.log(`   Conference ID: ${conferenceId}, Name: ${conferenceName || 'N/A'}`);
-                    
                     // Big 12 conference ID is 8
                     if (conferenceId === 8 || conferenceId === '8') {
-                        console.log(`  ✅ Matched "${team.name}" via Big 12 conference ID: ${conferenceId}`);
                         return true;
                     }
                     
@@ -553,12 +494,9 @@ const ByuBasketballPage = () => {
                     if (conferenceName) {
                         const conferenceLower = String(conferenceName).toLowerCase();
                         if (conferenceLower.includes('big 12') || conferenceLower.includes('big12') || conferenceLower === '12' || conferenceLower.includes('big twelve')) {
-                            console.log(`  ✅ Matched "${team.name}" via conference name: ${conferenceName}`);
                             return true;
                         }
                     }
-                } else {
-                    console.log(`   No raw team data provided`);
                 }
                 
                 // Direct abbreviation checks first (most reliable)
@@ -576,9 +514,8 @@ const ByuBasketballPage = () => {
                 if (big12Abbreviations[teamShortLower]) {
                     // Special check for CU - make sure it's not Colorado State
                     if (teamShortLower === 'cu' && (teamNameLower.includes('colorado state') || teamShortLower.includes('csu'))) {
-                        console.log(`  ❌ CU matched but it's Colorado State, not Colorado`);
+                        // Skip Colorado State
                     } else {
-                        console.log(`  ✅ Matched ${big12Abbreviations[teamShortLower]} via abbreviation "${teamShortLower}"`);
                         return true;
                     }
                 }
@@ -627,7 +564,6 @@ const ByuBasketballPage = () => {
                             if (pattern === 'houston' && teamNameLower.includes('houston baptist')) {
                                 continue; // Skip Houston Baptist
                             }
-                            console.log(`  ✅ Matched ${teamPattern.name} via full name pattern "${pattern}" (team: "${team.name}")`);
                             return true;
                         }
                         
@@ -651,20 +587,17 @@ const ByuBasketballPage = () => {
                             if (pattern === 'utah' && (teamShortLower.includes('usu') || teamShortLower.includes('utah st'))) {
                                 continue;
                             }
-                            console.log(`  ✅ Matched ${teamPattern.name} via short name pattern "${pattern}" (short: "${team.shortName}")`);
                             return true;
                         }
                     }
                 }
                 
-                console.log(`  ❌ NOT Big 12: "${team.name}" (${team.shortName})`);
                 return false;
             };
 
             // Filter to only show:
             // 1. Games from today only
             // 2. Games where at least one team is Big 12
-            console.log(`\n🔍 Filtering ${allGames.length} games for today's Big 12 games...`);
             
             // Helper to check if a date is today (ignoring time and timezone)
             const isToday = (date: Date) => {
@@ -677,7 +610,6 @@ const ByuBasketballPage = () => {
                 
                 const isMatch = todayStr === gameDateStr;
                 if (!isMatch) {
-                    console.log(`   Date mismatch: game date ${gameDateStr} vs today ${todayStr}`);
                 }
                 return isMatch;
             };
@@ -694,18 +626,11 @@ const ByuBasketballPage = () => {
                 }
             });
             
-            if (big12TeamsFound.size > 0) {
-                console.log(`\n🏀 Big 12 teams found in API response:`);
-                Array.from(big12TeamsFound).forEach(team => console.log(`   - ${team}`));
-            } else {
-                console.log(`\n⚠️  No Big 12 teams found in API response`);
-            }
             
             const filteredGames = allGames.filter((game: Game) => {
                 // First check if game is from today
                 const gameIsToday = isToday(game.date);
                 if (!gameIsToday) {
-                    console.log(`❌ Excluding game (not today): ${game.away.shortName} @ ${game.home.shortName} (${game.date.toLocaleDateString()})`);
                     return false;
                 }
                 
@@ -715,15 +640,8 @@ const ByuBasketballPage = () => {
                 // Then check if at least one team is Big 12
                 const homeIsBig12 = isBig12Team(game.home, rawData?.home);
                 const awayIsBig12 = isBig12Team(game.away, rawData?.away);
-                const isMatch = homeIsBig12 || awayIsBig12;
-                if (isMatch) {
-                    console.log(`✅ Including game: ${game.away.shortName} @ ${game.home.shortName}`);
-                } else {
-                    console.log(`❌ Excluding game (not Big 12): ${game.away.shortName} @ ${game.home.shortName}`);
-                }
-                return isMatch;
+                return homeIsBig12 || awayIsBig12;
             });
-            console.log(`📊 Filtered to ${filteredGames.length} today's Big 12 games\n`);
 
             // Sort games: active first, then finished, then by importance
             filteredGames.sort((a: Game, b: Game) => {
@@ -763,7 +681,6 @@ const ByuBasketballPage = () => {
                 }
             }
         } catch (err) {
-            console.error(err);
             setError("Unable to load scoreboard.");
             setLoading(false);
         }
