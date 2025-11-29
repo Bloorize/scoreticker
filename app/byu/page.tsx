@@ -1024,11 +1024,11 @@ const ByuPage = () => {
             {/* Plays Modal */}
             {showPlaysModal && activeGame.situation?.lastPlay && (
                 <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
                     onClick={() => setShowPlaysModal(false)}
                 >
                     <div 
-                        className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-lg w-full border border-white/40 shadow-2xl"
+                        className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-2xl w-full border border-white/40 shadow-2xl my-4"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-4">
@@ -1043,11 +1043,25 @@ const ByuPage = () => {
                                 <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                             </button>
                         </div>
-                        <div className="bg-white/60 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/40">
+                        
+                        <div className="bg-white/60 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/40 mb-4">
                             <p className="text-sm sm:text-base md:text-lg text-gray-800 leading-relaxed font-medium text-center">
                                 "{activeGame.situation.lastPlay}"
                             </p>
                         </div>
+
+                        {/* Football Field */}
+                        {activeGame.situation.yardLine !== undefined && activeGame.situation.possession && (
+                            <FootballField 
+                                yardLine={activeGame.situation.yardLine}
+                                possession={activeGame.situation.possession}
+                                homeTeam={activeGame.home}
+                                awayTeam={activeGame.away}
+                                isRedZone={activeGame.situation.isRedZone}
+                                activeGame={activeGame}
+                            />
+                        )}
+
                         {activeGame.venue && (
                             <div className="mt-4 flex items-center justify-center gap-2 text-gray-600 text-xs sm:text-sm">
                                 <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -1114,6 +1128,130 @@ const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: bo
         </span>
     </div>
 );
+
+// Football Field Component
+const FootballField = ({ yardLine, possession, homeTeam, awayTeam, isRedZone, activeGame }: { 
+    yardLine: number, 
+    possession: string, 
+    homeTeam: Team, 
+    awayTeam: Team,
+    isRedZone: boolean,
+    activeGame: Game
+}) => {
+    // Determine which team has the ball
+    const teamWithBall = possession === homeTeam.id ? homeTeam : awayTeam;
+    const isHomeTeam = possession === homeTeam.id;
+    
+    // Calculate position percentage (yardLine is 0-100, where 0 is away endzone, 100 is home endzone)
+    // For display, we'll show it as a percentage from left (away) to right (home)
+    const positionPercent = yardLine;
+    
+    // Generate yard markers (every 10 yards)
+    const yardMarkers = [];
+    for (let i = 0; i <= 100; i += 10) {
+        yardMarkers.push(i);
+    }
+    
+    return (
+        <div className="bg-white/80 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/40">
+            <div className="text-xs sm:text-sm font-bold text-gray-700 mb-2 text-center uppercase tracking-wider">
+                Field Position
+            </div>
+            <div className="relative w-full h-32 sm:h-40 bg-gradient-to-r from-green-600 via-green-500 to-green-600 rounded-lg overflow-hidden border-2 border-green-700 shadow-inner">
+                {/* Endzones */}
+                <div className="absolute left-0 top-0 w-[10%] h-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center">
+                    <div className="text-[8px] sm:text-[10px] font-black text-white uppercase transform -rotate-90 whitespace-nowrap">
+                        {awayTeam.shortName}
+                    </div>
+                </div>
+                <div className="absolute right-0 top-0 w-[10%] h-full bg-gradient-to-r from-red-500 to-red-600 flex items-center justify-center">
+                    <div className="text-[8px] sm:text-[10px] font-black text-white uppercase transform -rotate-90 whitespace-nowrap">
+                        {homeTeam.shortName}
+                    </div>
+                </div>
+                
+                {/* Yard Markers */}
+                {yardMarkers.map((yard) => {
+                    const isEndzone = yard === 0 || yard === 100;
+                    if (isEndzone) return null;
+                    
+                    const leftPercent = yard;
+                    const isMiddle = yard === 50;
+                    
+                    return (
+                        <div
+                            key={yard}
+                            className="absolute top-0 bottom-0 w-px bg-white/80"
+                            style={{ left: `${leftPercent}%` }}
+                        >
+                            <div className={`absolute ${isMiddle ? 'top-0' : 'top-1/2 -translate-y-1/2'} left-1/2 -translate-x-1/2 bg-white px-0.5 sm:px-1 py-0.5 rounded text-[7px] sm:text-[8px] font-black text-gray-800 whitespace-nowrap`}>
+                                {yard}
+                            </div>
+                        </div>
+                    );
+                })}
+                
+                {/* Red Zone Indicators */}
+                {isRedZone && (
+                    <div 
+                        className="absolute top-0 bottom-0 bg-red-500/20 border-l-2 border-r-2 border-red-600/40"
+                        style={{ 
+                            left: isHomeTeam ? '80%' : '10%',
+                            width: '10%'
+                        }}
+                    />
+                )}
+                
+                {/* Team Icon with Ball */}
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-300"
+                    style={{ left: `${positionPercent}%` }}
+                >
+                    <div 
+                        className="relative w-8 h-8 sm:w-10 sm:h-10 bg-white/90 backdrop-blur-sm rounded-full border-2 shadow-lg flex items-center justify-center"
+                        style={{ borderColor: teamWithBall.color || '#0062B8' }}
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                            src={teamWithBall.logo} 
+                            alt={teamWithBall.shortName}
+                            className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+                        />
+                        {/* Football indicator */}
+                        <div 
+                            className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center shadow-md border border-white"
+                            style={{ backgroundColor: teamWithBall.color || '#0062B8' }}
+                        >
+                            <FaFootball className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
+                        </div>
+                    </div>
+                    {/* Yard line label */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-black/70 text-white px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold whitespace-nowrap">
+                        {yardLine} yd
+                    </div>
+                </div>
+                
+                {/* Hash marks */}
+                <div className="absolute top-1/3 left-[10%] right-[10%] h-0.5 bg-white/60"></div>
+                <div className="absolute bottom-1/3 left-[10%] right-[10%] h-0.5 bg-white/60"></div>
+            </div>
+            
+            {/* Team info */}
+            <div className="mt-2 flex items-center justify-between text-[9px] sm:text-[10px] text-gray-600">
+                <div className="flex items-center gap-1.5">
+                    <div 
+                        className="w-3 h-3 rounded-full border border-white shadow-sm"
+                        style={{ backgroundColor: teamWithBall.color || '#0062B8' }}
+                    />
+                    <span className="font-bold">{teamWithBall.shortName} has the ball</span>
+                </div>
+                {activeGame.situation?.downDistanceText && (
+                    <span className="font-mono font-bold">{activeGame.situation.downDistanceText}</span>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const RankBadge = ({ rank }: { rank: number }) => (
     <span className="bg-[#002E5D]/90 backdrop-blur-md text-white text-[8px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-lg leading-none border border-white/20 shadow-sm">{rank}</span>
