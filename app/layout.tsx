@@ -18,6 +18,21 @@ export const metadata: Metadata = {
   description: "Track BYU football's journey to the College Football Playoff. Real-time scores, game predictions, rooting guide, and playoff odds.",
   keywords: ["BYU", "BYU Football", "College Football", "CFP", "College Football Playoff", "BYU Cougars", "Football Tracker"],
   authors: [{ name: "BYU Football Tracker" }],
+  icons: {
+    icon: [
+      { url: '/logo1.png', sizes: 'any' },
+      { url: '/logo1.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/logo1.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'BYU Football Tracker',
+  },
   other: {
     "google-adsense-account": "ca-pub-2568418773305987",
   },
