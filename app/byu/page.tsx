@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock } from 'lucide-react';
+import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X } from 'lucide-react';
 
 // --- Types ---
 interface Team {
@@ -106,6 +106,7 @@ const ByuPage = () => {
     const [slotsPerPage, setSlotsPerPage] = useState(4);
     const [mobileView, setMobileView] = useState<'game' | 'guide'>('game');
     const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
+    const [showPlaysModal, setShowPlaysModal] = useState(false);
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -578,7 +579,7 @@ const ByuPage = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 text-gray-900 font-sans overflow-hidden">
+        <div className="flex flex-col h-screen bg-white text-gray-900 font-sans overflow-hidden">
 
             {/* Main Feature Area */}
             <main className="flex-1 relative overflow-y-auto sm:overflow-hidden flex flex-col min-h-0">
@@ -720,13 +721,13 @@ const ByuPage = () => {
                                         <span className="text-center">{activeGame.venue}</span>
                                     </div>
                                     {activeGame.situation?.lastPlay && (
-                                        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center shadow-lg mt-4 max-w-md mx-auto">
-                                            <div className="flex items-center justify-center gap-2 mb-1">
-                                                <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
-                                                <span className="text-[10px] sm:text-xs font-bold text-[#0062B8] uppercase tracking-wider">Last Play</span>
-                                            </div>
-                                            <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-medium">"{activeGame.situation.lastPlay}"</p>
-                                        </div>
+                                        <button
+                                            onClick={() => setShowPlaysModal(true)}
+                                            className="mt-3 bg-white/60 backdrop-blur-xl border border-white/40 rounded-lg sm:rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-[#0062B8] hover:bg-white/80 transition-all shadow-md hover:shadow-lg flex items-center gap-1.5 mx-auto"
+                                        >
+                                            <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                            See Plays
+                                        </button>
                                     )}
                                 </div>
 
@@ -870,7 +871,7 @@ const ByuPage = () => {
                                         key={game.id}
                                         onClick={() => handleGameSelect(game.id)}
                                         className={`w-full text-left p-2 rounded-xl border transition-all backdrop-blur-md
-                                    ${selectedGameId === game.id ? 'bg-[#0062B8]/20 border-[#0062B8]/40 shadow-md' : 'bg-white/60 border-white/40 hover:bg-white/80 hover:border-white/60'}
+                                    ${selectedGameId === game.id ? 'bg-[#0062B8]/20 border-[#0062B8] shadow-md' : 'bg-white/60 border-[#0062B8]/30 hover:bg-white/80 hover:border-[#0062B8]/50'}
                                 `}
                                     >
                                         <div className="flex justify-between items-center mb-1">
@@ -984,6 +985,43 @@ const ByuPage = () => {
     </button>
 </div>
             </footer>
+
+            {/* Plays Modal */}
+            {showPlaysModal && activeGame.situation?.lastPlay && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setShowPlaysModal(false)}
+                >
+                    <div 
+                        className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-lg w-full border border-white/40 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <PlayCircle className="w-5 h-5 sm:w-6 sm:h-6 text-[#0062B8]" />
+                                <h3 className="text-base sm:text-lg font-black text-[#0062B8] uppercase tracking-wider">Last Play</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowPlaysModal(false)}
+                                className="p-1.5 sm:p-2 hover:bg-white/60 rounded-lg transition-all"
+                            >
+                                <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+                            </button>
+                        </div>
+                        <div className="bg-white/60 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/40">
+                            <p className="text-sm sm:text-base md:text-lg text-gray-800 leading-relaxed font-medium text-center">
+                                "{activeGame.situation.lastPlay}"
+                            </p>
+                        </div>
+                        {activeGame.venue && (
+                            <div className="mt-4 flex items-center justify-center gap-2 text-gray-600 text-xs sm:text-sm">
+                                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span>{activeGame.venue}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -1031,7 +1069,7 @@ const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: bo
                 <span className={`text-xs sm:text-sm font-bold truncate leading-tight ${isRootedFor ? 'text-[#0062B8]' : 'text-white'}`}>
                     {team.rank && <span className="text-[9px] sm:text-[10px] text-gray-300 mr-0.5 sm:mr-1">{team.rank}</span>}
                     {team.shortName}
-                    {isRootedFor && <span className="ml-0.5 sm:ml-1 text-[7px] sm:text-[8px] bg-[#0062B8] px-0.5 sm:px-1 rounded text-white">US</span>}
+                    {isRootedFor && <span className="ml-0.5 sm:ml-1 text-[7px] sm:text-[8px] bg-[#0062B8] px-0.5 sm:px-1 rounded text-white">Preferred</span>}
                 </span>
             </div>
             {hasBall && <div className="w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0062B8] animate-pulse flex-shrink-0 ml-0.5" />}
