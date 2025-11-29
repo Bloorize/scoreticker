@@ -439,16 +439,25 @@ const ByuPage = () => {
         return () => clearInterval(interval);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Initialize AdSense ads when component mounts
+    // Initialize AdSense ads when component mounts and ad element is ready
     useEffect(() => {
-        try {
-            // @ts-ignore - adsbygoogle is loaded by AdSense script
-            if (typeof window !== 'undefined') {
-                ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        const initializeAd = () => {
+            try {
+                // @ts-ignore - adsbygoogle is loaded by AdSense script
+                if (typeof window !== 'undefined' && (window as any).adsbygoogle) {
+                    ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+                }
+            } catch (err) {
+                console.error('AdSense initialization error:', err);
             }
-        } catch (err) {
-            console.error('AdSense initialization error:', err);
-        }
+        };
+
+        // Try immediately
+        initializeAd();
+
+        // Also try after a short delay to ensure script is loaded
+        const timeout = setTimeout(initializeAd, 500);
+        return () => clearTimeout(timeout);
     }, []);
 
     // Ticker Auto-Scroll - Always show 4 games per page (slot 1 is ad)
@@ -1061,14 +1070,12 @@ const ByuPage = () => {
     <div className="flex-1 flex divide-x divide-white/10 min-w-0 relative overflow-hidden">
         {/* Slot 1: Always show AdSense Ad */}
         <div className="flex-1 flex items-center justify-center px-2 sm:px-3 md:px-3 py-1.5 sm:py-2 border-r border-white/10 min-h-0 flex-shrink-0">
-            <div className="w-full h-full flex items-center justify-center bg-white/5 backdrop-blur-sm rounded">
+            <div className="flex items-center justify-center bg-white/5 backdrop-blur-sm rounded">
                 <ins
                     className="adsbygoogle"
-                    style={{ display: 'block', width: '100%' }}
+                    style={{ display: 'inline-block', width: '300px', height: '100px' }}
                     data-ad-client="ca-pub-2568418773305987"
-                    data-ad-slot="8653145512"
-                    data-ad-format="auto"
-                    data-full-width-responsive="true"
+                    data-ad-slot="8355415003"
                 />
             </div>
         </div>
