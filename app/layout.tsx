@@ -22,10 +22,11 @@ export const metadata: Metadata = {
     title: "BYU Football Tracker | Road to the CFP",
     description: "Track BYU football's journey to the College Football Playoff. Real-time scores, game predictions, rooting guide, and playoff odds.",
     type: "website",
+    url: "https://www.byufootballtracker.com",
     siteName: "BYU Football Tracker",
     images: [
       {
-        url: "/og-image.png",
+        url: "https://www.byufootballtracker.com/og-image.png",
         width: 1200,
         height: 630,
         alt: "BYU Football Tracker - Road to the CFP",
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BYU Football Tracker | Road to the CFP",
     description: "Track BYU football's journey to the College Football Playoff. Real-time scores, game predictions, rooting guide, and playoff odds.",
-    images: ["/og-image.png"],
+    images: ["https://www.byufootballtracker.com/og-image.png"],
   },
 };
 
