@@ -377,9 +377,30 @@ const ByuPage = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const filteredGames = allGames.filter((g: any) => g.rootingInterest !== undefined);
 
-            // Sort by Importance
+            // Sort: Active/Finished games first, then by importance
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            filteredGames.sort((a: any, b: any) => (a.rootingInterest?.importance || 99) - (b.rootingInterest?.importance || 99));
+            filteredGames.sort((a: any, b: any) => {
+                // Helper function to get sort priority (lower number = higher priority)
+                const getStatusPriority = (game: any) => {
+                    // Active games (isLive) get highest priority
+                    if (game.isLive) return 0;
+                    // Finished games (won/lost) get second priority
+                    if (game.rootingInterest?.status === 'won' || game.rootingInterest?.status === 'lost') return 1;
+                    // Pending games get lowest priority
+                    return 2;
+                };
+                
+                const aStatusPriority = getStatusPriority(a);
+                const bStatusPriority = getStatusPriority(b);
+                
+                // First sort by status (active/finished first)
+                if (aStatusPriority !== bStatusPriority) {
+                    return aStatusPriority - bStatusPriority;
+                }
+                
+                // If same status, sort by importance
+                return (a.rootingInterest?.importance || 99) - (b.rootingInterest?.importance || 99);
+            });
 
             setGames(filteredGames);
             setLastUpdated(new Date());
