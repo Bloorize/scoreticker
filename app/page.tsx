@@ -104,7 +104,7 @@ const ByuPage = () => {
     const [tickerPage, setTickerPage] = useState(0);
     const [isGameLocked, setIsGameLocked] = useState(false);
     const [currentGameIndex, setCurrentGameIndex] = useState(0);
-    const [slotsPerPage, setSlotsPerPage] = useState(4);
+    const [slotsPerPage, setSlotsPerPage] = useState(2);
     const [mobileView, setMobileView] = useState<'game' | 'guide'>('game');
     const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
     const [showPlaysModal, setShowPlaysModal] = useState(false);
@@ -455,7 +455,7 @@ const ByuPage = () => {
     // Auto-rotation removed - marquee only changes when user manually selects a game
 
     const activeGame = games.find(g => g.id === selectedGameId) || games[0];
-    // Responsive slots: 2 on mobile, 3 on tablet, 4 on desktop
+    // Responsive slots: 2 on mobile, 4 on tablet, 5 on desktop
     const visibleTickerGames = games.slice(tickerPage * slotsPerPage, (tickerPage + 1) * slotsPerPage);
     const emptySlotsCount = Math.max(0, slotsPerPage - visibleTickerGames.length);
     
@@ -538,7 +538,7 @@ const ByuPage = () => {
     // Update slots per page on resize
     useEffect(() => {
         const updateSlots = () => {
-            setSlotsPerPage(window.innerWidth >= 1024 ? 4 : window.innerWidth >= 640 ? 3 : 2);
+            setSlotsPerPage(window.innerWidth >= 1024 ? 5 : window.innerWidth >= 640 ? 4 : 2);
         };
         updateSlots();
         window.addEventListener('resize', updateSlots);
@@ -605,31 +605,31 @@ const ByuPage = () => {
                             <h1 className="text-sm sm:text-lg md:text-xl font-black italic tracking-tighter text-[#0062B8] leading-tight">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
                             <p className="text-[9px] sm:text-[10px] text-gray-600 font-medium tracking-widest uppercase leading-tight">Road to the CFP</p>
                         </div>
-                        
-                        {/* Mobile View Toggle Button - In Header */}
-                        <div className="sm:hidden flex-shrink-0 ml-1">
-                            <div className="bg-white/90 backdrop-blur-xl rounded-full px-2 py-1 shadow-lg border border-white/40 flex items-center gap-1">
-                                <button
-                                    onClick={() => setMobileView('game')}
-                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                                        mobileView === 'game' 
-                                            ? 'bg-[#0062B8] text-white shadow-md' 
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    Game
-                                </button>
-                                <button
-                                    onClick={() => setMobileView('guide')}
-                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                                        mobileView === 'guide' 
-                                            ? 'bg-[#0062B8] text-white shadow-md' 
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    Guide
-                                </button>
-                            </div>
+                    </div>
+                    
+                    {/* Mobile View Toggle Button - Expanded to fill space */}
+                    <div className="sm:hidden flex-1 min-w-0 flex justify-end">
+                        <div className="bg-white/90 backdrop-blur-xl rounded-full px-3 py-1.5 shadow-lg border border-white/40 flex items-center gap-1.5 w-full max-w-[200px]">
+                            <button
+                                onClick={() => setMobileView('game')}
+                                className={`flex-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                    mobileView === 'game' 
+                                        ? 'bg-[#0062B8] text-white shadow-md' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Game
+                            </button>
+                            <button
+                                onClick={() => setMobileView('guide')}
+                                className={`flex-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                    mobileView === 'guide' 
+                                        ? 'bg-[#0062B8] text-white shadow-md' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Guide
+                            </button>
                         </div>
                     </div>
 
@@ -723,7 +723,7 @@ const ByuPage = () => {
                                     {/* Left Arrow */}
                                     <button
                                         onClick={navigateToPreviousGame}
-                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 sm:-translate-x-8 md:-translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                                        className="absolute left-0 top-1/2 -translate-y-1/2 translate-x-2 sm:-translate-x-8 md:-translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
                                         title="Previous game"
                                     >
                                         <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#0062B8] group-hover:text-[#002E5D] transition-colors" />
@@ -733,8 +733,26 @@ const ByuPage = () => {
                                     <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6 md:gap-8 lg:gap-16 px-2">
                                     <BigTeamDisplay team={activeGame.away} isOpponentWinner={activeGame.home.isWinner} align="right" />
 
-                                    <div className="flex flex-col items-center gap-2 sm:gap-4">
+                                    <div className="flex flex-col items-center gap-2 sm:gap-4 relative">
                                         <div className="text-xl sm:text-2xl md:text-3xl lg:text-5xl font-black text-gray-300/40 italic select-none">VS</div>
+                                        
+                                        {/* WON/LOST Card for Finished Games */}
+                                        {!activeGame.isLive && activeGame.rootingInterest && (activeGame.rootingInterest.status === 'won' || activeGame.rootingInterest.status === 'lost') && (
+                                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-xl rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 border-2 shadow-xl z-10 ${
+                                                activeGame.rootingInterest.status === 'won' 
+                                                    ? 'border-green-500' 
+                                                    : 'border-red-500'
+                                            }`}>
+                                                <span className={`text-lg sm:text-xl md:text-2xl font-black uppercase tracking-wider ${
+                                                    activeGame.rootingInterest.status === 'won' 
+                                                        ? 'text-green-600' 
+                                                        : 'text-red-600'
+                                                }`}>
+                                                    {activeGame.rootingInterest.status === 'won' ? 'WON' : 'LOST'}
+                                                </span>
+                                            </div>
+                                        )}
+                                        
                                         {activeGame.isLive && activeGame.situation.downDistanceText && (
                                             <div className="flex flex-col items-center bg-[#002E5D]/90 backdrop-blur-xl rounded-xl sm:rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 border border-white/20 shadow-xl">
                                                 <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white font-mono tracking-tight">
@@ -750,7 +768,7 @@ const ByuPage = () => {
                                     {/* Right Arrow */}
                                     <button
                                         onClick={navigateToNextGame}
-                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 sm:translate-x-8 md:translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
+                                        className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:translate-x-8 md:translate-x-12 z-20 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/70 backdrop-blur-xl rounded-full border border-white/40 shadow-lg hover:bg-white/90 active:bg-white transition-all touch-manipulation flex items-center justify-center group"
                                         title="Next game"
                                     >
                                         <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#0062B8] group-hover:text-[#002E5D] transition-colors" />
@@ -787,15 +805,15 @@ const ByuPage = () => {
 
                                     {/* Leaders Module */}
                                     <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col">
-                                        <div className="mb-2 flex-shrink-0">
-                                            <h3 className="text-[9px] sm:text-[10px] font-bold text-[#002E5D] uppercase tracking-widest mb-1.5 border-b border-gray-200/50 pb-1 sm:pb-1.5">Game Leaders</h3>
+                                        <div className="mb-1.5 flex-shrink-0">
+                                            <h3 className="text-[10px] sm:text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-1 border-b border-gray-200/50 pb-1 sm:pb-1.5">Game Leaders</h3>
                                             
                                             {/* Team Filter Toggle */}
                                             {activeGame.leaders && activeGame.leaders.length > 0 && (
-                                                <div className="flex gap-1 mt-1.5 bg-white/40 backdrop-blur-sm rounded-lg p-0.5 border border-white/30">
+                                                <div className="flex gap-1 mt-1 bg-white/40 backdrop-blur-sm rounded-lg p-0.5 border border-white/30">
                                                     <button
                                                         onClick={() => setLeadersView('all')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
                                                             leadersView === 'all'
                                                                 ? 'bg-[#0062B8] text-white shadow-sm'
                                                                 : 'text-gray-600 hover:bg-white/60'
@@ -805,7 +823,7 @@ const ByuPage = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => setLeadersView('away')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
                                                             leadersView === 'away'
                                                                 ? 'bg-[#0062B8] text-white shadow-sm'
                                                                 : 'text-gray-600 hover:bg-white/60'
@@ -815,7 +833,7 @@ const ByuPage = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => setLeadersView('home')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[8px] sm:text-[9px] font-bold transition-all ${
+                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
                                                             leadersView === 'home'
                                                                 ? 'bg-[#0062B8] text-white shadow-sm'
                                                                 : 'text-gray-600 hover:bg-white/60'
@@ -853,18 +871,18 @@ const ByuPage = () => {
                                                     }
                                                     
                                                     return displayedLeaders.map((leader, i) => (
-                                                        <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                                                        <div key={i} className="flex items-center gap-2 sm:gap-2.5">
                                                             {leader.athlete.headshot ? (
                                                                 // eslint-disable-next-line @next/next/no-img-element
-                                                                <img src={leader.athlete.headshot} alt="" className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
+                                                                <img src={leader.athlete.headshot} alt="" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
                                                             ) : (
-                                                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[8px] sm:text-[9px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
+                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[9px] sm:text-[10px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
                                                             )}
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-[11px] sm:text-xs font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
-                                                                <div className="text-[9px] sm:text-[10px] text-gray-600 truncate">{leader.name}</div>
+                                                                <div className="text-xs sm:text-sm font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
+                                                                <div className="text-[10px] sm:text-xs text-gray-600 truncate">{leader.name}</div>
                                                             </div>
-                                                            <div className="text-[11px] sm:text-xs font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
+                                                            <div className="text-xs sm:text-sm font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
                                                         </div>
                                                     ));
                                                 })()}
@@ -957,17 +975,17 @@ const ByuPage = () => {
         </div>
 
         {/* Scroll Container */}
-        <div className="flex-1 flex items-stretch overflow-hidden">
-    <button onClick={prevTickerPage} className="w-8 sm:w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 active:bg-[#0062B8] flex items-center justify-center border-r border-white/10 z-10 transition-all touch-manipulation">
+        <div className="flex-1 flex items-stretch overflow-hidden min-w-0">
+    <button onClick={prevTickerPage} className="w-8 sm:w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 active:bg-[#0062B8] flex items-center justify-center border-r border-white/10 z-10 transition-all touch-manipulation flex-shrink-0">
         <ChevronLeft className="w-5 h-5 sm:w-5 sm:h-5 text-white" />
     </button>
 
-    <div className="flex-1 flex divide-x divide-white/10 w-full relative">
+    <div className="flex-1 flex divide-x divide-white/10 min-w-0 relative overflow-hidden">
         {visibleTickerGames.map((game) => (
             <button
                 key={game.id}
                 onClick={() => handleGameSelect(game.id)}
-                className={`group flex-1 px-3 sm:px-3 md:px-4 py-2 sm:py-2 flex flex-col justify-between transition-all relative overflow-hidden backdrop-blur-sm touch-manipulation min-w-0
+                className={`group flex-1 px-2 sm:px-3 md:px-3 py-1.5 sm:py-2 flex flex-col justify-between transition-all relative overflow-hidden backdrop-blur-sm touch-manipulation min-w-0
                   ${selectedGameId === game.id ? 'bg-white/10 border-t border-white/30' : 'hover:bg-white/5 active:bg-white/10'}
                 `}
             >
@@ -977,7 +995,7 @@ const ByuPage = () => {
                 )}
 
                 {/* Row 1: Header */}
-                <div className="flex justify-between items-center text-[9px] sm:text-[9px] md:text-[10px] text-gray-300 uppercase font-bold tracking-wider w-full mb-0.5">
+                <div className="flex justify-between items-center text-[9px] sm:text-[9px] md:text-[10px] text-gray-200 uppercase font-bold tracking-wider w-full mb-0.5">
                     <span className={`truncate mr-1 sm:mr-2 ${game.isLive ? 'text-red-400 animate-pulse' : ''}`}>
                         {game.statusDetail}
                     </span>
@@ -985,7 +1003,7 @@ const ByuPage = () => {
                 </div>
 
                 {/* Row 2: Teams */}
-                <div className="space-y-1.5 sm:space-y-1 w-full flex-1 flex flex-col justify-center">
+                <div className="space-y-1 sm:space-y-1 w-full flex-1 flex flex-col justify-center">
                     <TickerTeamRow
                         team={game.away}
                         hasBall={game.isLive && game.situation.possession === game.away.id}
@@ -999,7 +1017,7 @@ const ByuPage = () => {
                 </div>
 
                 {/* Row 3: Footer */}
-                <div className="h-3 sm:h-4 flex items-center justify-end w-full mt-0.5">
+                <div className="h-3 sm:h-3 flex items-center justify-end w-full mt-0.5">
                     {game.alert ? (
                         <div className={`text-[9px] font-black px-1.5 py-0.5 rounded animate-pulse
                        ${game.alert.type === 'TOUCHDOWN' ? 'bg-yellow-400 text-black' : 'bg-red-500 text-white'}
@@ -1017,13 +1035,13 @@ const ByuPage = () => {
             </button>
         ))}
 
-        {/* Always show 4 slots - fill empty slots */}
+        {/* Fill empty slots to maintain consistent layout */}
         {Array.from({ length: emptySlotsCount }).map((_, i) => (
             <div key={`empty-${i}`} className="flex-1 bg-transparent backdrop-blur-sm border-r border-white/10 last:border-r-0"></div>
         ))}
     </div>
 
-    <button onClick={nextTickerPage} className="w-8 sm:w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 active:bg-[#0062B8] flex items-center justify-center border-l border-white/10 z-10 transition-all touch-manipulation">
+    <button onClick={nextTickerPage} className="w-8 sm:w-8 bg-[#0062B8]/60 backdrop-blur-md hover:bg-[#0062B8]/80 active:bg-[#0062B8] flex items-center justify-center border-l border-white/10 z-10 transition-all touch-manipulation flex-shrink-0">
         <ChevronRight className="w-5 h-5 sm:w-5 sm:h-5 text-white" />
     </button>
 </div>
@@ -1118,20 +1136,23 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
 };
 
 const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: boolean, isRootedFor?: boolean }) => (
-    <div className="flex justify-between items-center gap-1">
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={team.logo} alt="" className="w-4 h-4 sm:w-4 sm:h-4 object-contain flex-shrink-0" />
+    <div className="flex justify-between items-center gap-1.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+            {/* Team Logo with White Background */}
+            <div className="w-6 h-6 sm:w-7 sm:h-7 bg-white rounded-full p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm border border-white/50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={team.logo} alt="" className="w-full h-full object-contain" />
+            </div>
             <div className="flex flex-col min-w-0 flex-1">
-                <span className={`text-xs sm:text-sm font-bold truncate leading-tight ${isRootedFor ? 'text-[#0062B8]' : 'text-white'}`}>
+                <span className={`text-xs sm:text-sm font-bold truncate leading-tight ${isRootedFor ? 'text-yellow-300' : 'text-white'}`}>
                     {team.rank && <span className="text-[9px] sm:text-[10px] text-gray-300 mr-0.5 sm:mr-1">{team.rank}</span>}
                     {team.shortName}
-                    {isRootedFor && <span className="ml-0.5 sm:ml-1 text-[7px] sm:text-[8px] bg-[#0062B8] px-0.5 sm:px-1 rounded text-white">Preferred</span>}
+                    {isRootedFor && <span className="ml-0.5 sm:ml-1 text-[7px] sm:text-[8px] bg-yellow-400 text-black px-0.5 sm:px-1 rounded font-black">Preferred</span>}
                 </span>
             </div>
-            {hasBall && <div className="w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0062B8] animate-pulse flex-shrink-0 ml-0.5" />}
+            {hasBall && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0 ml-0.5 shadow-sm" />}
         </div>
-        <span className={`font-mono font-black text-sm sm:text-sm flex-shrink-0 ${team.isWinner ? 'text-[#0062B8]' : 'text-white'}`}>
+        <span className={`font-mono font-black text-sm sm:text-base flex-shrink-0 ${team.isWinner ? 'text-yellow-300' : 'text-white'}`}>
             {team.score || '0'}
         </span>
     </div>
@@ -1280,10 +1301,10 @@ const MatchupPredictor = ({ game }: { game: Game }) => {
 
     return (
         <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col overflow-visible">
-            <h3 className="text-[9px] sm:text-[10px] font-bold text-[#002E5D] uppercase tracking-widest mb-2 sm:mb-3 text-center flex-shrink-0">MATCHUP PREDICTOR</h3>
+            <h3 className="text-[10px] sm:text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-1.5 sm:mb-2 text-center flex-shrink-0">MATCHUP PREDICTOR</h3>
             
             {/* Circular Chart */}
-            <div className="relative w-full aspect-square max-w-[140px] sm:max-w-[150px] md:max-w-[170px] mx-auto mb-2 sm:mb-3 flex-shrink-0 overflow-visible">
+            <div className="relative w-full aspect-square max-w-[140px] sm:max-w-[150px] md:max-w-[170px] mx-auto mb-1.5 sm:mb-2 flex-shrink-0 overflow-visible">
                 <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
                     {/* Away Team (Left Half) */}
                     <circle
@@ -1312,30 +1333,30 @@ const MatchupPredictor = ({ game }: { game: Game }) => {
                 
                 {/* Team Logos in Center */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={game.away.logo} alt={game.away.shortName} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
+                        <img src={game.away.logo} alt={game.away.shortName} className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={game.home.logo} alt={game.home.shortName} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
+                        <img src={game.home.logo} alt={game.home.shortName} className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
                     </div>
                 </div>
             </div>
 
             {/* Percentages */}
-            <div className="flex justify-between items-center gap-1.5 mb-1.5 flex-shrink-0">
-                <div className="flex items-center gap-1 flex-1">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: awayColor }}></div>
+            <div className="flex justify-between items-center gap-1.5 mb-1 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-1">
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: awayColor }}></div>
                     <div className="flex flex-col min-w-0">
-                        <div className="text-base sm:text-lg font-black text-gray-900">{awayProb.toFixed(1)}%</div>
-                        <div className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase truncate">{game.away.shortName}</div>
+                        <div className="text-lg sm:text-xl font-black text-gray-900">{awayProb.toFixed(1)}%</div>
+                        <div className="text-[10px] sm:text-xs font-bold text-gray-600 uppercase truncate">{game.away.shortName}</div>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 flex-1 justify-end">
+                <div className="flex items-center gap-1.5 flex-1 justify-end">
                     <div className="flex flex-col items-end min-w-0">
-                        <div className="text-base sm:text-lg font-black text-gray-900">{homeProb.toFixed(1)}%</div>
-                        <div className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase truncate">{game.home.shortName}</div>
+                        <div className="text-lg sm:text-xl font-black text-gray-900">{homeProb.toFixed(1)}%</div>
+                        <div className="text-[10px] sm:text-xs font-bold text-gray-600 uppercase truncate">{game.home.shortName}</div>
                     </div>
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: homeColor }}></div>
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: homeColor }}></div>
                 </div>
             </div>
 
