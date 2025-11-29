@@ -7,7 +7,7 @@ export async function GET() {
         const rankingsUrl = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings?_=${timestamp}`;
         
         const rankingsResponse = await fetch(rankingsUrl, {
-            next: { revalidate: 60 }, // Revalidate every 60 seconds
+            next: { revalidate: 30 }, // Revalidate every 30 seconds for more frequent updates
         });
         
         if (!rankingsResponse.ok) {
@@ -46,7 +46,7 @@ export async function GET() {
         const day = String(today.getDate()).padStart(2, '0');
         const dateStr = `${year}${month}${day}`;
         
-        // Also fetch a range of dates to catch more teams
+        // Also fetch a range of dates to catch more teams (prioritize recent dates)
         const scoreboardPromises = [];
         for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
             const fetchDate = new Date(today);
@@ -58,7 +58,7 @@ export async function GET() {
             
             scoreboardPromises.push(
                 fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${fetchDateStr}&limit=300&_=${timestamp}`, {
-                    next: { revalidate: 60 },
+                    next: { revalidate: 30 }, // Reduced cache time to 30 seconds for more frequent updates
                 }).then(res => res.ok ? res.json() : null).catch(() => null)
             );
         }
@@ -66,9 +66,12 @@ export async function GET() {
         const scoreboardResults = await Promise.all(scoreboardPromises);
         
         // Extract records from scoreboard games - use team ID as key for better matching
-        const teamRecordsById: Record<string, { name: string; record: string }> = {};
+        // Process in reverse order (most recent first) to prioritize latest records
+        const teamRecordsById: Record<string, { name: string; record: string; date: number }> = {};
         
-        scoreboardResults.forEach((scoreboardData: any) => {
+        // Process scoreboard results in reverse order (most recent first) to prioritize latest records
+        // This ensures records from last night's games (like Texas A&M vs Texas) take precedence
+        scoreboardResults.reverse().forEach((scoreboardData: any, dayIndex: number) => {
             if (scoreboardData?.events) {
                 scoreboardData.events.forEach((event: any) => {
                     const competition = event.competitions?.[0];
@@ -79,9 +82,12 @@ export async function GET() {
                             const record = competitor.records?.[0]?.summary;
                             
                             if (teamId && teamName && record) {
-                                // Store by both ID and name for flexible lookup
-                                teamRecordsById[teamId] = { name: teamName, record };
-                                if (!teamRecordsMap[teamName]) {
+                                // Always update with most recent data (dayIndex 0 = today, most recent)
+                                // If we already have a record, only replace if this is from a more recent day
+                                const existing = teamRecordsById[teamId];
+                                if (!existing || dayIndex < existing.date) {
+                                    teamRecordsById[teamId] = { name: teamName, record, date: dayIndex };
+                                    // Always update teamRecordsMap with most recent data
                                     teamRecordsMap[teamName] = record;
                                 }
                             }
@@ -96,7 +102,7 @@ export async function GET() {
         // Also try standings API as backup
         const standingsUrl = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/standings?_=${timestamp}`;
         const standingsResponse = await fetch(standingsUrl, {
-            next: { revalidate: 60 },
+            next: { revalidate: 30 }, // Reduced cache time for more frequent updates
         });
         
         if (standingsResponse.ok) {

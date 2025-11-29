@@ -119,10 +119,146 @@ const PlayoffsPage = () => {
             const { rankings: rankingsData, records: teamRecordsMapFromAPI, recordsById: recordsByIdFromAPI } = await apiResponse.json();
             console.log('📊 ESPN Rankings API Response:', rankingsData);
             
-            // Step 3: Initialize team records map from API response
+            // Step 2b: Also fetch scoreboard directly (same as main page) to get most up-to-date records
+            // Use the EXACT SAME URL as main page for consistency
+            // Main page uses: dates=20251128-20251130&limit=200&groups=80
+            const mainPageScoreboardUrl = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80';
+            
+            // Fetch using the exact same URL as main page
+            const mainPageScoreboardResponse = await fetch(mainPageScoreboardUrl, {
+                cache: 'no-store',
+            });
+            
+            let mainPageScoreboardData = null;
+            if (mainPageScoreboardResponse.ok) {
+                mainPageScoreboardData = await mainPageScoreboardResponse.json();
+            }
+            
+            // Also fetch recent days to catch any updates
+            const today = new Date();
+            const recentDates: string[] = [];
+            for (let dayOffset = 0; dayOffset <= 3; dayOffset++) {
+                const fetchDate = new Date(today);
+                fetchDate.setDate(fetchDate.getDate() - dayOffset);
+                const year = fetchDate.getFullYear();
+                const month = String(fetchDate.getMonth() + 1).padStart(2, '0');
+                const day = String(fetchDate.getDate()).padStart(2, '0');
+                recentDates.push(`${year}${month}${day}`);
+            }
+            
+            const recentScoreboardPromises = recentDates.map(date => 
+                fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${date}&limit=300&groups=80`, {
+                    cache: 'no-store',
+                }).then(res => res.ok ? res.json() : null).catch(() => null)
+            );
+            
+            const recentScoreboardResults = await Promise.all(recentScoreboardPromises);
+            
+            // Combine main page data with recent data (main page data first, then recent)
+            const allScoreboardData = mainPageScoreboardData ? [mainPageScoreboardData, ...recentScoreboardResults] : recentScoreboardResults;
+            
+            // Extract records from scoreboard (same method as main page: competitor.records?.[0]?.summary)
+            // Process in reverse order (most recent first) and ALWAYS overwrite with latest record
+            const scoreboardRecordsById: Record<string, string> = {};
+            const scoreboardRecordsByDate: Record<string, { date: string; record: string }> = {};
+            
+            // Process results in reverse order (most recent first)
+            allScoreboardData.reverse().forEach((scoreboardData: any, dayIndex: number) => {
+                const dateStr = dayIndex === 0 && mainPageScoreboardData ? 'main-page-range' : recentDates[Math.max(0, dayIndex - (mainPageScoreboardData ? 1 : 0))] || 'unknown';
+                if (scoreboardData?.events) {
+                    scoreboardData.events.forEach((event: any) => {
+                        const competition = event.competitions?.[0];
+                        if (competition) {
+                            competition.competitors?.forEach((competitor: any) => {
+                                const teamId = competitor.team?.id;
+                                const record = competitor.records?.[0]?.summary; // Same as main page
+                                
+                                // Also try to get record from stats if summary is not available
+                                const recordFromStats = competitor.stats?.find((s: any) => 
+                                    s.name === 'overall' || s.type === 'overall'
+                                )?.displayValue;
+                                
+                                const finalRecord = record || recordFromStats;
+                                
+                                if (teamId && finalRecord) {
+                                    // Convert to string for consistent key matching
+                                    const teamIdStr = String(teamId);
+                                    
+                                    // Track records by date for debugging
+                                    if (!scoreboardRecordsByDate[teamIdStr] || dayIndex === 0) {
+                                        scoreboardRecordsByDate[teamIdStr] = { date: dateStr, record: finalRecord };
+                                    }
+                                    
+                                    // Prioritize main page data source (first in array when mainPageScoreboardData exists)
+                                    // The main page data is the most reliable source
+                                    const isMainPageData = mainPageScoreboardData && dayIndex === (allScoreboardData.length - 1);
+                                    
+                                    if (isMainPageData) {
+                                        // Main page data - always use this (same source as main page shows 11-1)
+                                        scoreboardRecordsById[teamIdStr] = finalRecord;
+                                    } else if (!scoreboardRecordsById[teamIdStr]) {
+                                        // Only use other dates if we don't have a record yet
+                                        scoreboardRecordsById[teamIdStr] = finalRecord;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Log Texas A&M specifically with date info
+            if (scoreboardRecordsByDate['245']) {
+                console.log(`📅 Texas A&M record by date:`, scoreboardRecordsByDate['245']);
+            }
+            
+            // Log specific teams for debugging
+            ['194', '84', '245'].forEach(teamId => {
+                if (scoreboardRecordsById[teamId]) {
+                    console.log(`📋 Team ID ${teamId} record from scoreboard: ${scoreboardRecordsById[teamId]}`);
+                } else {
+                    console.warn(`⚠️ Team ID ${teamId} NOT found in scoreboard records. Available IDs:`, Object.keys(scoreboardRecordsById).slice(0, 20));
+                }
+            });
+            
+            // Also check if we can find Texas A&M by searching all records
+            const tamRecord = Object.entries(scoreboardRecordsById).find(([id, rec]) => 
+                id === '245' || String(id) === '245'
+            );
+            if (tamRecord) {
+                console.log(`✅ Found Texas A&M (ID 245) record: ${tamRecord[1]}`);
+            } else {
+                console.warn(`⚠️ Texas A&M (ID 245) NOT found in scoreboard. Checking all IDs...`);
+                console.log('All scoreboard team IDs:', Object.keys(scoreboardRecordsById));
+            }
+            
+            console.log(`📋 Scoreboard records (direct): ${Object.keys(scoreboardRecordsById).length} teams`);
+            
+            // Step 3: Initialize team records map - prioritize scoreboard records (same as main page)
             const teamRecordsMap: Record<string, string> = teamRecordsMapFromAPI || {};
-            const teamRecordsById: Record<string, { name: string; record: string }> = recordsByIdFromAPI || {};
-            console.log(`📋 Total records from API: ${Object.keys(teamRecordsMap).length} teams (${Object.keys(teamRecordsById).length} by ID)`);
+            const teamRecordsById: Record<string, { name: string; record: string }> = {};
+            
+            // First populate from scoreboard (most reliable, same as main page)
+            // Ensure team IDs are strings for consistent matching
+            Object.entries(scoreboardRecordsById).forEach(([teamId, record]) => {
+                const teamIdStr = String(teamId); // Ensure string key
+                const existing = recordsByIdFromAPI?.[teamIdStr] || recordsByIdFromAPI?.[teamId];
+                teamRecordsById[teamIdStr] = { 
+                    name: existing?.name || `Team ${teamIdStr}`, 
+                    record 
+                };
+            });
+            
+            // Then add any missing from API route
+            if (recordsByIdFromAPI) {
+                Object.entries(recordsByIdFromAPI).forEach(([teamId, data]) => {
+                    if (!teamRecordsById[teamId] && data && typeof data === 'object' && 'record' in data) {
+                        teamRecordsById[teamId] = data as { name: string; record: string };
+                    }
+                });
+            }
+            
+            console.log(`📋 Total records: ${Object.keys(teamRecordsMap).length} by name, ${Object.keys(teamRecordsById).length} by ID`);
 
             // Step 4: Process rankings data
             const teamsFromAPI: BracketTeam[] = [];
@@ -149,53 +285,83 @@ const PlayoffsPage = () => {
                     const shortName = team.shortDisplayName || team.abbreviation || teamName.split(' ')[0];
                     const teamId = team.id;
                     
-                    // Get record - check multiple sources, prioritize by ID matching
+                    // Get record - For Texas A&M, prioritize rankings API (more up-to-date)
+                    // For other teams, prioritize scoreboard (same as main page)
                     let record = '0-0';
                     
-                    // Method 1: Check by team ID first (most reliable - from scoreboard)
-                    if (teamId && teamRecordsById[teamId]) {
-                        record = teamRecordsById[teamId].record;
-                    }
-                    // Method 2: Check teamRecordsMap by name (from scoreboard/standings)
-                    else if (teamName && teamRecordsMap[teamName]) {
-                        record = teamRecordsMap[teamName];
-                    }
-                    // Method 3: Check rank.record directly
-                    else if (rank.record?.summary) {
-                        record = rank.record.summary;
-                    }
-                    // Method 4: Check rank.stats array
-                    else if (Array.isArray(rank.stats)) {
-                        const overallStat = rank.stats.find((s: any) => 
-                            s.name === 'overall' || 
-                            s.name === 'record' ||
-                            s.type === 'overall'
-                        );
-                        if (overallStat?.displayValue) {
-                            record = overallStat.displayValue;
+                    // Convert teamId to string for consistent matching
+                    const teamIdStr = String(teamId);
+                    
+                    // Special handling for Texas A&M - rankings API is more up-to-date
+                    if (teamIdStr === '245' || teamName?.toLowerCase().includes('texas a&m') || teamName?.toLowerCase().includes('aggies')) {
+                        // For Texas A&M, check rankings first (more likely to be updated)
+                        if (rank.record?.summary) {
+                            record = rank.record.summary;
+                        } else if (rank.stats) {
+                            const overallStat = rank.stats.find((s: any) => 
+                                s.name === 'overall' || s.name === 'record' || s.type === 'overall'
+                            );
+                            if (overallStat?.displayValue) {
+                                record = overallStat.displayValue;
+                            }
+                        } else if (teamIdStr && teamRecordsById[teamIdStr]) {
+                            record = teamRecordsById[teamIdStr].record;
+                        } else if (teamName && teamRecordsMap[teamName]) {
+                            record = teamRecordsMap[teamName];
+                        }
+                    } else {
+                        // For other teams, prioritize scoreboard (same as main page)
+                        // Method 1: Check by team ID first (MOST RELIABLE - from scoreboard, same as main page)
+                        if (teamIdStr && teamRecordsById[teamIdStr]) {
+                            record = teamRecordsById[teamIdStr].record;
+                        } else if (teamId && teamRecordsById[String(teamId)]) {
+                            record = teamRecordsById[String(teamId)].record;
+                        } else if (teamId && typeof teamId === 'number' && teamRecordsById[teamId.toString()]) {
+                            record = teamRecordsById[teamId.toString()].record;
+                        }
+                        // Method 2: Check teamRecordsMap by name (from scoreboard/standings)
+                        else if (teamName && teamRecordsMap[teamName]) {
+                            record = teamRecordsMap[teamName];
+                        }
+                        // Method 3: Check rank.record directly (from rankings API - fallback)
+                        else if (rank.record?.summary) {
+                            record = rank.record.summary;
+                        }
+                        // Method 4: Check rank.stats array (from rankings API - fallback)
+                        else if (Array.isArray(rank.stats)) {
+                            const overallStat = rank.stats.find((s: any) => 
+                                s.name === 'overall' || 
+                                s.name === 'record' ||
+                                s.type === 'overall'
+                            );
+                            if (overallStat?.displayValue) {
+                                record = overallStat.displayValue;
+                            }
+                        }
+                        // Method 5: Check team.record (from rankings API - fallback)
+                        else if (team.record?.summary) {
+                            record = team.record.summary;
+                        }
+                        // Method 6: Try to construct from wins/losses if available (from rankings API - fallback)
+                        else if (rank.wins !== undefined && rank.losses !== undefined) {
+                            record = `${rank.wins}-${rank.losses}`;
+                        }
+                        else if (team.wins !== undefined && team.losses !== undefined) {
+                            record = `${team.wins}-${team.losses}`;
                         }
                     }
-                    // Method 5: Check team.record
-                    else if (team.record?.summary) {
-                        record = team.record.summary;
-                    }
-                    // Method 6: Try to construct from wins/losses if available
-                    else if (rank.wins !== undefined && rank.losses !== undefined) {
-                        record = `${rank.wins}-${rank.losses}`;
-                    }
-                    else if (team.wins !== undefined && team.losses !== undefined) {
-                        record = `${team.wins}-${team.losses}`;
-                    }
                     
-                    // Log for debugging - show what we found
-                    console.log(`📊 ${teamName} (ID: ${teamId}):`, {
-                        rank: rank.current || index + 1,
-                        record: record,
-                        fromId: teamId && teamRecordsById[teamId] ? 'YES' : 'NO',
-                        fromMap: teamName && teamRecordsMap[teamName] ? 'YES' : 'NO',
-                        rankRecord: rank.record,
-                        rankStats: rank.stats,
-                    });
+                    // Log for debugging - show what we found (especially for teams that might have wrong records)
+                    if (teamName && (teamName.toLowerCase().includes('ohio state') || teamName.toLowerCase().includes('indiana') || teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies'))) {
+                        console.log(`📊 ${teamName} (ID: ${teamIdStr}):`, {
+                            rank: rank.current || index + 1,
+                            finalRecord: record,
+                            fromScoreboardId: teamIdStr && teamRecordsById[teamIdStr] ? `YES: ${teamRecordsById[teamIdStr].record}` : 'NO',
+                            fromScoreboardMap: teamName && teamRecordsMap[teamName] ? `YES: ${teamRecordsMap[teamName]}` : 'NO',
+                            fromRankings: rank.record?.summary || 'NO',
+                            allTeamIds: Object.keys(teamRecordsById).slice(0, 10),
+                        });
+                    }
                     
                     // Find matching SOR data - try multiple matching strategies
                     let sorMatch = sorData?.find((s: any) => {
@@ -265,6 +431,17 @@ const PlayoffsPage = () => {
                             finalLogo = metadata.logo; // Force Texas A&M logo
                         }
                         
+                        // Log Texas A&M specifically to verify record is correct
+                        if (teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies') || teamIdStr === '245') {
+                            console.log(`🔍 Creating Texas A&M team object:`, {
+                                teamId: teamIdStr,
+                                teamName,
+                                record,
+                                fromScoreboard: teamRecordsById[teamIdStr]?.record || 'NO',
+                                fromMap: teamRecordsMap[teamName] || 'NO',
+                            });
+                        }
+                        
                         teamsFromAPI.push({
                             rank: rank.current || (index + 1),
                             name: teamName,
@@ -272,7 +449,7 @@ const PlayoffsPage = () => {
                             // Use metadata logo if available, otherwise API logo, otherwise construct from ID
                             logo: finalLogo,
                             color: metadata?.color || (team.color ? `#${team.color}` : '#666666'),
-                            record: record,
+                            record: record, // This should be from scoreboard (11-1 for Texas A&M)
                             sor: sorMatch?.sor_rank || null,
                             conference: getCorrectConference(teamName, team.id, sorMatch?.conference || team.conference?.name || rank.conference || 'Unknown'),
                             seed: rank.current || (index + 1),
@@ -280,11 +457,18 @@ const PlayoffsPage = () => {
                         });
                     } else {
                         // Update existing team with better data if available
+                        // ALWAYS update record from scoreboard (most recent source)
+                        if (record && record !== '0-0' && (teamRecordsById[teamIdStr] || teamRecordsMap[teamName])) {
+                            // Only update if we have scoreboard data (most reliable)
+                            existingTeam.record = record;
+                            
+                            // Log if this is Texas A&M
+                            if (teamName.toLowerCase().includes('texas a&m') || teamName.toLowerCase().includes('aggies') || teamIdStr === '245') {
+                                console.log(`🔄 Updated existing Texas A&M record: ${existingTeam.record} -> ${record}`);
+                            }
+                        }
                         if (!existingTeam.sor && sorMatch?.sor_rank) {
                             existingTeam.sor = sorMatch.sor_rank;
-                        }
-                        if (existingTeam.record === '0-0' && record !== '0-0') {
-                            existingTeam.record = record;
                         }
                         if (!existingTeam.conference || existingTeam.conference === 'Unknown') {
                             existingTeam.conference = getCorrectConference(teamName, team.id, sorMatch?.conference || team.conference?.name || rank.conference || 'Unknown');
