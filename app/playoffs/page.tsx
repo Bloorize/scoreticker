@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, RefreshCw, ToggleLeft, ToggleRight, Info, X } from 'lucide-react';
+import { Trophy, RefreshCw, ToggleLeft, ToggleRight, Info, X, Share2, MessageCircle, Twitter, Facebook } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
@@ -59,6 +59,7 @@ const PlayoffsPage = () => {
     const [loading, setLoading] = useState(true);
     const [showFormulaModal, setShowFormulaModal] = useState(false);
     const [first2Out, setFirst2Out] = useState<BracketTeam[]>([]); // Next 2 teams that would be in
+    const [showShareMenu, setShowShareMenu] = useState(false);
 
     // Team logo/color mapping (will be enhanced with API data later)
     const teamMetadata: Record<string, { logo: string; color: string; shortName: string }> = {
@@ -895,6 +896,49 @@ const PlayoffsPage = () => {
         return <div className="w-0.5 bg-white/30 flex-1"></div>;
     };
 
+    // Share functionality
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const shareText = 'Check out the College Football Playoff Bracket! View real rankings and fair rankings based on SOR & performance.';
+
+    const shareViaSMS = () => {
+        const message = `${shareText} ${shareUrl}`;
+        window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
+        setShowShareMenu(false);
+    };
+
+    const shareViaTwitter = () => {
+        const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+        window.open(url, '_blank', 'width=550,height=420');
+        setShowShareMenu(false);
+    };
+
+    const shareViaFacebook = () => {
+        const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+        window.open(url, '_blank', 'width=550,height=420');
+        setShowShareMenu(false);
+    };
+
+    const shareViaNative = async () => {
+        if (typeof navigator !== 'undefined' && 'share' in navigator) {
+            try {
+                await navigator.share({
+                    title: 'College Football Playoff Bracket',
+                    text: shareText,
+                    url: shareUrl,
+                });
+                setShowShareMenu(false);
+            } catch (err) {
+                // User cancelled or error occurred
+            }
+        } else {
+            // Fallback: copy to clipboard
+            if (typeof window !== 'undefined' && window.navigator && 'clipboard' in window.navigator) {
+                window.navigator.clipboard.writeText(shareUrl).catch(() => {});
+                setShowShareMenu(false);
+            }
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#0047BA] p-4 sm:p-6 lg:p-8">
             {/* Header */}
@@ -941,6 +985,60 @@ const PlayoffsPage = () => {
                         >
                             <RefreshCw className={`w-4 h-4 text-white ${loading ? 'animate-spin' : ''}`} />
                         </button>
+                        
+                        {/* Share Button */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowShareMenu(!showShareMenu)}
+                                className="p-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 shadow-lg hover:bg-white/30 transition-all"
+                                aria-label="Share"
+                            >
+                                <Share2 className="w-4 h-4 text-white" />
+                            </button>
+                            
+                            {/* Share Menu Dropdown */}
+                            {showShareMenu && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-30" 
+                                        onClick={() => setShowShareMenu(false)}
+                                    ></div>
+                                    <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-40 min-w-[180px]">
+                                        {typeof navigator !== 'undefined' && 'share' in navigator && (
+                                            <button
+                                                onClick={shareViaNative}
+                                                className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                            >
+                                                <Share2 className="w-4 h-4" />
+                                                <span>Share...</span>
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={shareViaSMS}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <MessageCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Text</span>
+                                        </button>
+                                        <button
+                                            onClick={shareViaTwitter}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <Twitter className="w-4 h-4 text-black" />
+                                            <span>X (Twitter)</span>
+                                        </button>
+                                        <button
+                                            onClick={shareViaFacebook}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <Facebook className="w-4 h-4 text-blue-600" />
+                                            <span>Facebook</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        
                         <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl border border-white/30 shadow-lg px-4 py-3">
                             <span className="text-xs sm:text-sm font-bold text-white">Real Rankings</span>
                             <button

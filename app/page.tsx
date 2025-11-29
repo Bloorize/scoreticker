@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X } from 'lucide-react';
+import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X, Share2, MessageCircle, Twitter, Facebook } from 'lucide-react';
 import { FaFootball } from 'react-icons/fa6';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -114,6 +114,7 @@ const ByuPage = () => {
     const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
     const [gameDetailView, setGameDetailView] = useState<'stats' | 'live'>('stats');
     const [sorData, setSorData] = useState<Record<string, number | null>>({}); // Cache SOR data: key is team_id or short_name, value is sor_value (can be null)
+    const [showShareMenu, setShowShareMenu] = useState(false);
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -885,6 +886,49 @@ const ByuPage = () => {
         });
     };
 
+    // Share functionality
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const shareText = 'Check out PlayoffTracker - Road to the CFP! Track college football games and playoff rankings.';
+
+    const shareViaSMS = () => {
+        const message = `${shareText} ${shareUrl}`;
+        window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
+        setShowShareMenu(false);
+    };
+
+    const shareViaTwitter = () => {
+        const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+        window.open(url, '_blank', 'width=550,height=420');
+        setShowShareMenu(false);
+    };
+
+    const shareViaFacebook = () => {
+        const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+        window.open(url, '_blank', 'width=550,height=420');
+        setShowShareMenu(false);
+    };
+
+    const shareViaNative = async () => {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'PlayoffTracker - Road to the CFP',
+                    text: shareText,
+                    url: shareUrl,
+                });
+                setShowShareMenu(false);
+            } catch (err) {
+                // User cancelled or error occurred
+            }
+        } else {
+            // Fallback: copy to clipboard
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(shareUrl);
+                setShowShareMenu(false);
+            }
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen bg-white text-gray-900 font-sans overflow-hidden">
 
@@ -970,24 +1014,90 @@ const ByuPage = () => {
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
                             <span className="text-[10px] sm:text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
                         </div>
+                        {/* View Playoffs button - hidden on mobile, shown below header */}
                         <Link 
                             href="/playoffs"
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation flex items-center gap-1.5 sm:gap-2"
+                            className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation"
                         >
                             <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             <span>View Playoffs</span>
                         </Link>
+                        
+                        {/* Share Button */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowShareMenu(!showShareMenu)}
+                                className="p-2 sm:p-2.5 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40 touch-manipulation"
+                                aria-label="Share"
+                            >
+                                <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#0062B8]" />
+                            </button>
+                            
+                            {/* Share Menu Dropdown */}
+                            {showShareMenu && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-30" 
+                                        onClick={() => setShowShareMenu(false)}
+                                    ></div>
+                                    <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-40 min-w-[180px]">
+                                        {typeof navigator !== 'undefined' && 'share' in navigator && (
+                                            <button
+                                                onClick={shareViaNative}
+                                                className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                            >
+                                                <Share2 className="w-4 h-4" />
+                                                <span>Share...</span>
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={shareViaSMS}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <MessageCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Text</span>
+                                        </button>
+                                        <button
+                                            onClick={shareViaTwitter}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <Twitter className="w-4 h-4 text-black" />
+                                            <span>X (Twitter)</span>
+                                        </button>
+                                        <button
+                                            onClick={shareViaFacebook}
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-3 text-sm text-gray-700 transition-colors"
+                                        >
+                                            <Facebook className="w-4 h-4 text-blue-600" />
+                                            <span>Facebook</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        
                         <button onClick={() => fetchGames()} className="p-2 sm:p-2.5 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40 touch-manipulation">
                             <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? 'animate-spin' : 'text-[#0062B8]'}`} />
                         </button>
                     </div>
                 </header>
 
+                {/* View Playoffs button - Mobile only, positioned below header */}
+                <div className="sm:hidden px-3 pt-16 pb-1 relative z-10">
+                    <Link 
+                        href="/playoffs"
+                        className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation w-full"
+                    >
+                        <Trophy className="w-4 h-4" />
+                        <span>View Playoffs</span>
+                    </Link>
+                </div>
+
                 {/* Content Grid: Main Game + Sidebar */}
                 <div className={`flex-1 flex flex-col sm:flex-row min-h-0 ${gameDetailView === 'live' ? 'overflow-visible' : 'overflow-visible sm:overflow-hidden'}`}>
 
                     {/* Left: Main Game Display */}
-                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-20 md:pt-20 min-h-0 flex-shrink-0 ${gameDetailView === 'live' ? 'overflow-y-auto' : 'overflow-visible'} ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
+                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-2 sm:pt-20 md:pt-20 min-h-0 flex-shrink-0 ${gameDetailView === 'live' ? 'overflow-y-auto' : 'overflow-visible'} ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
                         {activeGame ? (
                             <div className="w-full max-w-5xl flex flex-col items-center animate-in fade-in duration-700">
 
