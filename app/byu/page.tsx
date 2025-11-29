@@ -431,20 +431,7 @@ const ByuPage = () => {
         return () => clearInterval(interval);
     }, [games.length, slotsPerPage]);
 
-    // Marquee Game Auto-Rotation
-    useEffect(() => {
-        if (isGameLocked || games.length === 0) return;
-
-        const interval = setInterval(() => {
-            setCurrentGameIndex(prev => {
-                const nextIndex = (prev + 1) % games.length;
-                setSelectedGameId(games[nextIndex].id);
-                return nextIndex;
-            });
-        }, 10000);
-
-        return () => clearInterval(interval);
-    }, [isGameLocked, games]);
+    // Auto-rotation removed - marquee only changes when user manually selects a game
 
     const activeGame = games.find(g => g.id === selectedGameId) || games[0];
     // Responsive slots: 2 on mobile, 3 on tablet, 4 on desktop
@@ -648,7 +635,7 @@ const ByuPage = () => {
                                         ? 'bg-[#0062B8]/90 border-white/30 text-white hover:bg-[#0062B8]' 
                                         : 'bg-white/60 border-white/40 text-[#0062B8] hover:bg-white/80'
                                 }`}
-                                title={isGameLocked ? 'Unlock to auto-rotate games' : 'Lock current game'}
+                                title={isGameLocked ? 'Unlock game selection' : 'Lock game selection'}
                             >
                                 {isGameLocked ? (
                                     <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -700,7 +687,7 @@ const ByuPage = () => {
                                                 ? 'bg-[#0062B8]/90 border-white/30 text-white hover:bg-[#0062B8]' 
                                                 : 'bg-white/60 border-white/40 text-[#0062B8] hover:bg-white/80'
                                         }`}
-                                        title={isGameLocked ? 'Unlock to auto-rotate games' : 'Lock current game'}
+                                        title={isGameLocked ? 'Unlock game selection' : 'Lock game selection'}
                                     >
                                         {isGameLocked ? (
                                             <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
