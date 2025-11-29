@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X } from 'lucide-react';
+import { FaFootball } from 'react-icons/fa6';
 
 // --- Types ---
 interface Team {
@@ -586,13 +587,13 @@ const ByuPage = () => {
 
                 {/* Header Overlay */}
                 <header className="absolute top-0 w-full z-20 p-2 sm:p-2.5 md:p-3 flex flex-wrap justify-between items-center gap-2 sm:gap-3 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm">
-                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
                         {/* BYU Logo */}
                         <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/50 p-1 flex-shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/logo1.png" alt="BYU" className="w-full h-full object-contain" />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-shrink-0">
                             <h1 className="text-sm sm:text-lg md:text-xl font-black italic tracking-tighter text-[#0062B8] leading-tight">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
                             <p className="text-[9px] sm:text-[10px] text-gray-600 font-medium tracking-widest uppercase leading-tight">Road to the CFP</p>
                         </div>
@@ -624,6 +625,40 @@ const ByuPage = () => {
                         </div>
                     </div>
 
+                    {/* WE WANT Bar - Hidden on mobile, between logo and last updated */}
+                    {activeGame && activeGame.rootingInterest && (
+                        <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 mx-2 sm:mx-4">
+                            <div className="bg-[#0062B8]/90 backdrop-blur-xl px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-lg border border-white/30 shadow-lg flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                                <span className="text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-widest flex-shrink-0">We Want:</span>
+                                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                    <span className="font-black text-xs sm:text-sm md:text-base text-white truncate">{activeGame.rootingInterest?.teamName}</span>
+                                    {activeGame.rootingInterest?.status === 'winning' || activeGame.rootingInterest?.status === 'won' ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-200 flex-shrink-0" />
+                                    ) : activeGame.rootingInterest?.status === 'pending' ? (
+                                        <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-200 flex-shrink-0" />
+                                    ) : (
+                                        <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-200 flex-shrink-0" />
+                                    )}
+                                </div>
+                            </div>
+                            <button
+                                onClick={toggleLock}
+                                className={`p-1 sm:p-1.5 rounded-lg backdrop-blur-xl border transition-all shadow-lg touch-manipulation flex-shrink-0 ${
+                                    isGameLocked 
+                                        ? 'bg-[#0062B8]/90 border-white/30 text-white hover:bg-[#0062B8]' 
+                                        : 'bg-white/60 border-white/40 text-[#0062B8] hover:bg-white/80'
+                                }`}
+                                title={isGameLocked ? 'Unlock to auto-rotate games' : 'Lock current game'}
+                            >
+                                {isGameLocked ? (
+                                    <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                ) : (
+                                    <Unlock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                )}
+                            </button>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                         <div className="hidden sm:flex flex-col items-end text-right">
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
@@ -639,12 +674,12 @@ const ByuPage = () => {
                 <div className="flex-1 flex flex-col sm:flex-row overflow-visible sm:overflow-hidden min-h-0">
 
                     {/* Left: Main Game Display */}
-                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-24 md:pt-24 min-h-0 flex-shrink-0 overflow-visible ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
+                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-20 md:pt-20 min-h-0 flex-shrink-0 overflow-visible ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
                         {activeGame ? (
                             <div className="w-full max-w-5xl flex flex-col items-center animate-in fade-in duration-700">
 
-                                {/* Rooting Context Badge */}
-                                <div className="mb-2 sm:mb-3 md:mb-4 flex items-center gap-2 sm:gap-3 z-30 w-full max-w-5xl px-2">
+                                {/* Rooting Context Badge - Mobile Only */}
+                                <div className="sm:hidden mb-2 sm:mb-3 md:mb-4 flex items-center gap-2 sm:gap-3 z-30 w-full max-w-5xl px-2">
                                     <div className="bg-[#0062B8]/90 backdrop-blur-xl px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-xl sm:rounded-2xl border border-white/30 shadow-xl flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                         <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-widest flex-shrink-0">We Want:</span>
                                         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -840,7 +875,7 @@ const ByuPage = () => {
                     </div>
 
                     {/* Right: Playoff Implications Sidebar */}
-                    <div className={`w-full sm:w-80 lg:w-72 xl:w-80 bg-white/40 backdrop-blur-xl border-l border-white/30 sm:border-t-0 border-t border-white/20 flex flex-col pt-0 sm:pt-24 shadow-lg min-h-[400px] sm:min-h-0 flex-shrink-0 ${mobileView === 'game' ? 'hidden sm:flex' : 'flex'}`}>
+                    <div className={`w-full sm:w-80 lg:w-72 xl:w-80 bg-white/40 backdrop-blur-xl border-l border-white/30 sm:border-t-0 border-t border-white/20 flex flex-col pt-0 sm:pt-[72px] md:pt-[80px] shadow-lg min-h-[400px] sm:min-h-0 flex-shrink-0 ${mobileView === 'game' ? 'hidden sm:flex' : 'flex'}`}>
                         <div className="p-3 sm:p-4 border-b border-white/20 bg-[#0062B8]/90 backdrop-blur-xl flex-shrink-0 sticky top-0 z-10">
                             <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-2 mb-2">
                                 <Trophy className="w-4 h-4 text-white" />
@@ -1038,8 +1073,8 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={team.logo} alt={team.name} className={`w-full h-full object-contain drop-shadow-lg ${isLoser ? 'grayscale opacity-70' : ''}`} />
                 {team.hasBall && (
-                    <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 bg-[#0062B8] rounded-full p-1 sm:p-1.5 shadow-lg border-2 border-white backdrop-blur-sm">
-                        <div className="w-2 h-2 sm:w-3 sm:h-3 bg-[#002E5D] rounded-full"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 rounded-full p-0.5 sm:p-1 shadow-lg border-2 border-white backdrop-blur-sm" style={{ backgroundColor: team.color || '#0062B8' }}>
+                        <FaFootball className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                     </div>
                 )}
             </div>
