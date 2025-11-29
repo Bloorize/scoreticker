@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X } from 'lucide-react';
 import { FaFootball } from 'react-icons/fa6';
+import { supabase } from '@/lib/supabase';
 
 // --- Types ---
 interface Team {
@@ -14,6 +15,7 @@ interface Team {
     rank: number | null;
     color: string;
     record: string;
+    sor: number | null; // Strength of Record
     isWinner: boolean;
     hasBall: boolean;
 }
@@ -94,6 +96,8 @@ const MATCHUP_LIST = [
     { team: 'Texas Tech', opponent: 'West Virginia', priority: 16 }, // You Decide
 ];
 
+// SOR data will be fetched from Supabase
+
 const ByuPage = () => {
     const [games, setGames] = useState<Game[]>([]);
     const [loading, setLoading] = useState(true);
@@ -108,15 +112,19 @@ const ByuPage = () => {
     const [mobileView, setMobileView] = useState<'game' | 'guide'>('game');
     const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
     const [gameDetailView, setGameDetailView] = useState<'stats' | 'live'>('stats');
+    const [sorData, setSorData] = useState<Record<string, number | null>>({}); // Cache SOR data: key is team_id or short_name, value is sor_value (can be null)
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
-    const fetchGames = async () => {
+    const fetchGames = async (sorDataOverride?: Record<string, number | null>) => {
         try {
             setLoading(true);
             const response = await fetch(DATA_URL);
             if (!response.ok) throw new Error('Failed to fetch');
             const data = await response.json();
+
+            // Use provided SOR data or fall back to state
+            const currentSorData = sorDataOverride || sorData;
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const allGames = (data.events || []).map((event: any) => {
@@ -148,28 +156,49 @@ const ByuPage = () => {
                     else if (text.includes('safety')) alert = { type: 'SAFETY', text: 'SAFETY' };
                 }
 
+                // Helper function to get SOR value from Supabase cache
+                const getSOR = (teamId: string, shortName: string): number | null => {
+                    // Check team_id first, then short_name
+                    if (teamId in currentSorData) {
+                        return currentSorData[teamId];
+                    }
+                    if (shortName in currentSorData) {
+                        return currentSorData[shortName];
+                    }
+                    return null;
+                };
+
                 // Parse Teams
+                const homeShortName = home.team.shortDisplayName || home.team.abbreviation;
+                const awayShortName = away.team.shortDisplayName || away.team.abbreviation;
+                
+                // Get team IDs from ESPN API (home.team.id and away.team.id are the actual team IDs)
+                const homeTeamId = home.team.id || home.id;
+                const awayTeamId = away.team.id || away.id;
+                
                 const homeTeam = {
                     id: home.id,
                     name: home.team.displayName,
-                    shortName: home.team.shortDisplayName || home.team.abbreviation,
+                    shortName: homeShortName,
                     logo: home.team.logo,
                     score: home.score,
                     rank: home.curatedRank?.current < 26 ? home.curatedRank.current : null,
                     color: home.team.color ? `#${home.team.color}` : '#333',
                     record: home.records?.[0]?.summary,
+                    sor: getSOR(homeTeamId, homeShortName),
                     isWinner: home.winner,
                     hasBall: situation.possession === home.id
                 };
                 const awayTeam = {
                     id: away.id,
                     name: away.team.displayName,
-                    shortName: away.team.shortDisplayName || away.team.abbreviation,
+                    shortName: awayShortName,
                     logo: away.team.logo,
                     score: away.score,
                     rank: away.curatedRank?.current < 26 ? away.curatedRank.current : null,
                     color: away.team.color ? `#${away.team.color}` : '#333',
                     record: away.records?.[0]?.summary,
+                    sor: getSOR(awayTeamId, awayShortName),
                     isWinner: away.winner,
                     hasBall: situation.possession === away.id
                 };
@@ -433,9 +462,266 @@ const ByuPage = () => {
         }
     };
 
+    // Fetch SOR data from Supabase (from college_football_fpi table)
+    const fetchSORData = async (): Promise<Record<string, number | null>> => {
+        try {
+            // Check if Supabase is configured
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+            const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+            
+            if (!supabaseUrl || !supabaseKey) {
+                console.warn('⚠️ Supabase credentials not configured. SOR data will not be available.');
+                console.warn('   Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local');
+                return {};
+            }
+            
+            // Mapping from team_strength_of_record table team names to ESPN team identifiers
+            // Maps full team names (e.g., "Indiana Hoosiers") to team_id and short_name used by ESPN API
+            const teamNameMapping: Record<string, { teamId?: string; shortNames: string[] }> = {
+                'Indiana Hoosiers': { teamId: '84', shortNames: ['Indiana', 'Hoosiers'] },
+                'Texas A&M Aggies': { teamId: '2', shortNames: ['Texas A&M', 'Aggies'] },
+                'Ohio State Buckeyes': { teamId: '103', shortNames: ['Ohio State', 'Ohio St'] },
+                'Georgia Bulldogs': { teamId: '61', shortNames: ['Georgia', 'Bulldogs'] },
+                'Oregon Ducks': { teamId: '2483', shortNames: ['Oregon', 'Ducks'] },
+                'Ole Miss Rebels': { teamId: '145', shortNames: ['Ole Miss', 'Mississippi'] },
+                'BYU Cougars': { teamId: '252', shortNames: ['BYU', 'Cougars'] },
+                'Oklahoma Sooners': { teamId: '201', shortNames: ['Oklahoma', 'Sooners'] },
+                'Alabama Crimson Tide': { teamId: '333', shortNames: ['Alabama', 'Crimson Tide'] },
+                'Texas Tech Red Raiders': { teamId: '2641', shortNames: ['Texas Tech', 'Red Raiders'] },
+                'Texas Longhorns': { teamId: '251', shortNames: ['Texas', 'Longhorns'] },
+                'Vanderbilt Commodores': { teamId: '238', shortNames: ['Vanderbilt', 'Commodores'] },
+                'Notre Dame Fighting Irish': { teamId: '87', shortNames: ['Notre Dame', 'Fighting Irish'] },
+                'Michigan Wolverines': { teamId: '130', shortNames: ['Michigan', 'Wolverines'] },
+                'Utah Utes': { teamId: '254', shortNames: ['Utah', 'Utes'] },
+                'Miami Hurricanes': { teamId: '2390', shortNames: ['Miami', 'Hurricanes'] },
+                'USC Trojans': { teamId: '30', shortNames: ['USC', 'Trojans'] },
+                'Tennessee Volunteers': { teamId: '2633', shortNames: ['Tennessee', 'Volunteers'] },
+                'Iowa Hawkeyes': { teamId: '2294', shortNames: ['Iowa', 'Hawkeyes'] },
+                'LSU Tigers': { teamId: '99', shortNames: ['LSU', 'Tigers'] },
+                'Arizona Wildcats': { teamId: '12', shortNames: ['Arizona', 'Wildcats'] },
+                'Washington Huskies': { teamId: '264', shortNames: ['Washington', 'Huskies'] },
+                'Missouri Tigers': { teamId: '142', shortNames: ['Missouri', 'Tigers'] },
+                'Virginia Cavaliers': { teamId: '258', shortNames: ['Virginia', 'Cavaliers'] },
+                'Illinois Fighting Illini': { teamId: '356', shortNames: ['Illinois', 'Fighting Illini'] },
+                'Georgia Tech Yellow Jackets': { teamId: '59', shortNames: ['Georgia Tech', 'Yellow Jackets'] },
+                'Arizona State Sun Devils': { teamId: '9', shortNames: ['Arizona State', 'Arizona St'] },
+                'Pittsburgh Panthers': { teamId: '221', shortNames: ['Pittsburgh', 'Pitt'] },
+                'South Florida Bulls': { teamId: '58', shortNames: ['South Florida', 'Bulls'] },
+                'SMU Mustangs': { teamId: '2567', shortNames: ['SMU', 'Mustangs'] },
+                'TCU Horned Frogs': { teamId: '2628', shortNames: ['TCU', 'Horned Frogs'] },
+                'Houston Cougars': { teamId: '248', shortNames: ['Houston', 'Cougars'] },
+                'Iowa State Cyclones': { teamId: '66', shortNames: ['Iowa State', 'Iowa St'] },
+                'Wake Forest Demon Deacons': { teamId: '154', shortNames: ['Wake Forest', 'Demon Deacons'] },
+                'Louisville Cardinals': { teamId: '97', shortNames: ['Louisville', 'Cardinals'] },
+                'Cincinnati Bearcats': { teamId: '2132', shortNames: ['Cincinnati', 'Bearcats'] },
+                'UNLV Rebels': { teamId: '2439', shortNames: ['UNLV', 'Rebels'] },
+                'Kentucky Wildcats': { teamId: '96', shortNames: ['Kentucky', 'Wildcats'] },
+                'NC State Wolfpack': { teamId: '152', shortNames: ['NC State', 'Wolfpack'] },
+                'Northwestern Wildcats': { teamId: '77', shortNames: ['Northwestern', 'Wildcats'] },
+                'Nebraska Cornhuskers': { teamId: '158', shortNames: ['Nebraska', 'Cornhuskers'] },
+                'Auburn Tigers': { teamId: undefined, shortNames: ['Auburn', 'Tigers'] }, // Note: team_id needs verification
+                'Wisconsin Badgers': { teamId: '275', shortNames: ['Wisconsin', 'Badgers'] },
+                'Minnesota Golden Gophers': { teamId: '135', shortNames: ['Minnesota', 'Golden Gophers'] },
+                'Boise State Broncos': { teamId: '68', shortNames: ['Boise State', 'Boise St'] },
+                'Mississippi State Bulldogs': { teamId: '344', shortNames: ['Mississippi State', 'Mississippi St'] },
+                'South Carolina Gamecocks': { teamId: '2579', shortNames: ['South Carolina', 'Gamecocks'] },
+                'Penn State Nittany Lions': { teamId: '213', shortNames: ['Penn State', 'Nittany Lions'] },
+                'Florida Gators': { teamId: '57', shortNames: ['Florida', 'Gators'] },
+                'Rutgers Scarlet Knights': { teamId: '164', shortNames: ['Rutgers', 'Scarlet Knights'] },
+                'West Virginia Mountaineers': { teamId: '277', shortNames: ['West Virginia', 'Mountaineers'] },
+                'East Carolina Pirates': { teamId: '151', shortNames: ['East Carolina', 'Pirates'] },
+                'Clemson Tigers': { teamId: '228', shortNames: ['Clemson', 'Tigers'] },
+                'Duke Blue Devils': { teamId: '150', shortNames: ['Duke', 'Blue Devils'] },
+                'Florida State Seminoles': { teamId: '52', shortNames: ['Florida State', 'Florida St'] },
+                'UCF Knights': { teamId: '2116', shortNames: ['UCF', 'Knights'] },
+                'Kansas Jayhawks': { teamId: '2305', shortNames: ['Kansas', 'Jayhawks'] },
+                'Stanford Cardinal': { teamId: '24', shortNames: ['Stanford', 'Cardinal'] },
+                'UCLA Bruins': { teamId: '26', shortNames: ['UCLA', 'Bruins'] },
+                'Oklahoma State Cowboys': { teamId: '197', shortNames: ['Oklahoma State', 'Oklahoma St'] },
+                'Syracuse Orange': { teamId: '183', shortNames: ['Syracuse', 'Orange'] },
+                'Maryland Terrapins': { teamId: '120', shortNames: ['Maryland', 'Terrapins'] },
+                'Michigan State Spartans': { teamId: '127', shortNames: ['Michigan State', 'Michigan St'] },
+                'Arkansas Razorbacks': { teamId: '8', shortNames: ['Arkansas', 'Razorbacks'] },
+                'Colorado Buffaloes': { teamId: '38', shortNames: ['Colorado', 'Buffaloes'] },
+                'Virginia Tech Hokies': { teamId: '259', shortNames: ['Virginia Tech', 'Hokies'] },
+                'North Carolina Tar Heels': { teamId: '153', shortNames: ['North Carolina', 'Tar Heels'] },
+                'Purdue Boilermakers': { teamId: '2509', shortNames: ['Purdue', 'Boilermakers'] },
+                'Boston College Eagles': { teamId: undefined, shortNames: ['Boston College', 'Eagles'] }, // Note: team_id conflicts with Ohio State
+                'Oregon State Beavers': { teamId: '204', shortNames: ['Oregon State', 'Oregon St'] },
+                'Washington State Cougars': { teamId: '265', shortNames: ['Washington State', 'Washington St'] },
+                // Additional teams from the full list
+                'Navy Midshipmen': { teamId: undefined, shortNames: ['Navy', 'Midshipmen'] },
+                'James Madison Dukes': { teamId: '256', shortNames: ['James Madison', 'Dukes'] },
+                'Tulane Green Wave': { teamId: '2655', shortNames: ['Tulane', 'Green Wave'] },
+                'North Texas Mean Green': { teamId: '249', shortNames: ['North Texas', 'Mean Green'] },
+                'New Mexico Lobos': { teamId: '167', shortNames: ['New Mexico', 'Lobos'] },
+                'Old Dominion Monarchs': { teamId: '295', shortNames: ['Old Dominion', 'Monarchs'] },
+                'Kennesaw State Owls': { teamId: '338', shortNames: ['Kennesaw State', 'Kennesaw St'] },
+                'San Diego State Aztecs': { teamId: '21', shortNames: ['San Diego State', 'San Diego St'] },
+                'Baylor Bears': { teamId: '239', shortNames: ['Baylor', 'Bears'] },
+                'Western Kentucky Hilltoppers': { teamId: '98', shortNames: ['Western Kentucky', 'Western KY'] },
+                'Kansas State Wildcats': { teamId: '2306', shortNames: ['Kansas State', 'Kansas St'] },
+                'Memphis Tigers': { teamId: undefined, shortNames: ['Memphis', 'Tigers'] },
+                'UConn Huskies': { teamId: undefined, shortNames: ['UConn', 'Huskies'] },
+                'UTSA Roadrunners': { teamId: '2636', shortNames: ['UTSA', 'Roadrunners'] },
+                'Hawai\'i Rainbow Warriors': { teamId: '62', shortNames: ['Hawai\'i', 'Rainbow Warriors'] },
+                'Fresno State Bulldogs': { teamId: '278', shortNames: ['Fresno State', 'Fresno St'] },
+                'Troy Trojans': { teamId: '2653', shortNames: ['Troy', 'Trojans'] },
+                'California Golden Bears': { teamId: '25', shortNames: ['California', 'Golden Bears'] },
+                'Central Michigan Chippewas': { teamId: '2117', shortNames: ['Central Michigan', 'C Michigan'] },
+                'Toledo Rockets': { teamId: '2649', shortNames: ['Toledo', 'Rockets'] },
+                'Coastal Carolina Chanticleers': { teamId: '324', shortNames: ['Coastal Carolina', 'Coastal'] },
+                'Utah State Aggies': { teamId: '328', shortNames: ['Utah State', 'Aggies'] },
+                'Southern Miss Golden Eagles': { teamId: '2572', shortNames: ['Southern Miss', 'Golden Eagles'] },
+                'Army Black Knights': { teamId: '349', shortNames: ['Army', 'Black Knights'] },
+                'Miami (OH) RedHawks': { teamId: '193', shortNames: ['Miami OH', 'RedHawks'] },
+                'Jacksonville State Gamecocks': { teamId: '55', shortNames: ['Jacksonville State', 'Jax State'] },
+                'Florida International Panthers': { teamId: '2229', shortNames: ['Florida International', 'FIU'] },
+                'Louisiana Tech Bulldogs': { teamId: '2348', shortNames: ['Louisiana Tech', 'Bulldogs'] },
+                'Georgia Southern Eagles': { teamId: '290', shortNames: ['Georgia Southern', 'GA Southern'] },
+                'Louisiana Ragin\' Cajuns': { teamId: '309', shortNames: ['Louisiana', 'Ragin\' Cajuns'] },
+                'Rice Owls': { teamId: '242', shortNames: ['Rice', 'Owls'] },
+                'Temple Owls': { teamId: '218', shortNames: ['Temple', 'Owls'] },
+                'Texas State Bobcats': { teamId: '326', shortNames: ['Texas State', 'Texas St'] },
+                'Marshall Thundering Herd': { teamId: '276', shortNames: ['Marshall', 'Thundering Herd'] },
+                'Arkansas State Red Wolves': { teamId: '2032', shortNames: ['Arkansas State', 'Arkansas St'] },
+                'App State Mountaineers': { teamId: '2026', shortNames: ['App State', 'Mountaineers'] },
+                'Kent State Golden Flashes': { teamId: '2309', shortNames: ['Kent State', 'Golden Flashes'] },
+                'Florida Atlantic Owls': { teamId: '2226', shortNames: ['Florida Atlantic', 'FAU'] },
+                'Delaware Blue Hens': { teamId: '48', shortNames: ['Delaware', 'Blue Hens'] },
+                'Tulsa Golden Hurricane': { teamId: '202', shortNames: ['Tulsa', 'Golden Hurricane'] },
+                'Ball State Cardinals': { teamId: '2050', shortNames: ['Ball State', 'Cardinals'] },
+                'Wyoming Cowboys': { teamId: '2751', shortNames: ['Wyoming', 'Cowboys'] },
+                'UAB Blazers': { teamId: '5', shortNames: ['UAB', 'Blazers'] },
+                'South Alabama Jaguars': { teamId: '6', shortNames: ['South Alabama', 'Jaguars'] },
+                'New Mexico State Aggies': { teamId: '166', shortNames: ['New Mexico State', 'New Mexico St'] },
+                'Liberty Flames': { teamId: '2335', shortNames: ['Liberty', 'Flames'] },
+                'Nevada Wolf Pack': { teamId: '2440', shortNames: ['Nevada', 'Wolf Pack'] },
+                'Air Force Falcons': { teamId: '2005', shortNames: ['Air Force', 'Falcons'] },
+                'San José State Spartans': { teamId: '23', shortNames: ['San José State', 'San José St'] },
+                'UL Monroe Warhawks': { teamId: '2433', shortNames: ['UL Monroe', 'Warhawks'] },
+                'Buffalo Bulls': { teamId: '2084', shortNames: ['Buffalo', 'Bulls'] },
+                'Sam Houston Bearkats': { teamId: '2534', shortNames: ['Sam Houston', 'Bearkats'] },
+                'Charlotte 49ers': { teamId: '2429', shortNames: ['Charlotte', '49ers'] },
+                'Georgia State Panthers': { teamId: '2247', shortNames: ['Georgia State', 'Georgia St'] },
+                'UTEP Miners': { teamId: '2638', shortNames: ['UTEP', 'Miners'] },
+                'Middle Tennessee Blue Raiders': { teamId: '2393', shortNames: ['Middle Tennessee', 'MTSU'] },
+            };
+            
+            // Try fetching from team_strength_of_record table first
+            let data: Array<{ team_name: string; sor_rank?: number; strength_of_record_rank?: number }> | null = null;
+            let error: any = null;
+            
+            const { data: sorRecordData, error: sorRecordError } = await supabase
+                .from('team_strength_of_record')
+                .select('team_name, sor_rank');
+
+            // If team_strength_of_record doesn't exist, try college_football_fpi
+            if (sorRecordError && (sorRecordError.code === '42P01' || sorRecordError.message?.includes('does not exist'))) {
+                console.log('📊 team_strength_of_record table not found, trying college_football_fpi...');
+                const { data: fpiData, error: fpiError } = await supabase
+                    .from('college_football_fpi')
+                    .select('team_name, strength_of_record_rank');
+                
+                if (fpiError && (fpiError.code === '42P01' || fpiError.message?.includes('does not exist'))) {
+                    console.log('📊 college_football_fpi table not found, trying team_sor table...');
+                    const { data: sorData, error: sorError } = await supabase
+                        .from('team_sor')
+                        .select('team_id, team_short_name, sor_value')
+                        .eq('season', 2025);
+                    
+                    if (sorError) {
+                        console.error('❌ Error fetching SOR data:', sorError);
+                        return {};
+                    }
+                    
+                    if (sorData && sorData.length > 0) {
+                        const sorMap: Record<string, number | null> = {};
+                        sorData.forEach((row) => {
+                            if (row.team_id && row.sor_value !== null) {
+                                sorMap[row.team_id] = row.sor_value;
+                            }
+                            if (row.team_short_name && row.sor_value !== null) {
+                                sorMap[row.team_short_name] = row.sor_value;
+                            }
+                        });
+                        setSorData(sorMap);
+                        console.log('✅ Loaded SOR data from team_sor:', Object.keys(sorMap).length, 'teams');
+                        return sorMap;
+                    }
+                    return {};
+                }
+                
+                if (fpiError) {
+                    console.error('❌ Error fetching SOR data:', fpiError);
+                    return {};
+                }
+                
+                data = fpiData;
+                error = fpiError;
+            } else {
+                data = sorRecordData;
+                error = sorRecordError;
+            }
+
+            if (error) {
+                console.error('❌ Error fetching SOR data:', error);
+                return {};
+            }
+
+            if (data && data.length > 0) {
+                // Build a lookup map: team_id -> sor_value and short_name -> sor_value
+                const sorMap: Record<string, number | null> = {};
+                data.forEach((row) => {
+                    // Handle both sor_rank (from team_strength_of_record) and strength_of_record_rank (from college_football_fpi)
+                    const sorValue = (row as any).sor_rank !== undefined ? (row as any).sor_rank : (row as any).strength_of_record_rank;
+                    if (sorValue === null || sorValue === undefined) return;
+                    
+                    const mapping = teamNameMapping[row.team_name];
+                    if (mapping) {
+                        // Add by team_id if available
+                        if (mapping.teamId) {
+                            sorMap[mapping.teamId] = sorValue;
+                        }
+                        // Add by all short names
+                        mapping.shortNames.forEach(shortName => {
+                            sorMap[shortName] = sorValue;
+                        });
+                    } else {
+                        // Fallback: try to extract short name from full name
+                        // e.g., "Indiana Hoosiers" -> try "Indiana"
+                        const nameParts = row.team_name.split(' ');
+                        if (nameParts.length > 0) {
+                            sorMap[nameParts[0]] = sorValue;
+                        }
+                        sorMap[row.team_name] = sorValue;
+                    }
+                });
+                setSorData(sorMap);
+                console.log('✅ Loaded SOR data:', Object.keys(sorMap).length, 'team identifiers');
+                return sorMap;
+            } else {
+                console.warn('⚠️ No SOR data returned from Supabase');
+                return {};
+            }
+        } catch (err) {
+            console.error('❌ Exception fetching SOR data:', err);
+            return {};
+        }
+    };
+
+    // Load SOR data first, then fetch games
     useEffect(() => {
-        fetchGames();
-        const interval = setInterval(fetchGames, 30000);
+        const loadData = async () => {
+            // First, load SOR data and get the map directly
+            const sorMap = await fetchSORData();
+            // Then fetch games with the SOR data passed directly
+            await fetchGames(sorMap);
+        };
+        loadData();
+        const interval = setInterval(() => {
+            fetchGames(); // Just refresh games periodically (will use state sorData)
+        }, 30000);
         return () => clearInterval(interval);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -699,7 +985,7 @@ const ByuPage = () => {
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
                             <span className="text-[10px] sm:text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
                         </div>
-                        <button onClick={fetchGames} className="p-2 sm:p-2.5 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40 touch-manipulation">
+                        <button onClick={() => fetchGames()} className="p-2 sm:p-2.5 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40 touch-manipulation">
                             <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? 'animate-spin' : 'text-[#0062B8]'}`} />
                         </button>
                     </div>
@@ -807,6 +1093,19 @@ const ByuPage = () => {
                                     <div className="flex items-center justify-center gap-2 text-gray-700 text-xs sm:text-sm font-medium">
                                         <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
                                         <span className="text-center">{activeGame.venue}</span>
+                                        {activeGame.date && (
+                                            <>
+                                                <span className="text-gray-400">•</span>
+                                                <span className="text-center">
+                                                    {activeGame.date.toLocaleTimeString('en-US', { 
+                                                        hour: 'numeric', 
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                        timeZoneName: 'short'
+                                                    })}
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1028,7 +1327,13 @@ const ByuPage = () => {
                                         ${game.rootingInterest?.status === 'winning' || game.rootingInterest?.status === 'won' ? 'bg-green-100 text-green-700' :
                                                     game.rootingInterest?.status === 'pending' ? 'bg-gray-200 text-gray-600' : 'bg-red-100 text-red-700'}
                                     `}>
-                                                {game.rootingInterest?.status.toUpperCase()}
+                                                {game.rootingInterest?.status === 'pending' && game.date
+                                                    ? game.date.toLocaleTimeString('en-US', { 
+                                                        hour: 'numeric', 
+                                                        minute: '2-digit',
+                                                        hour12: true
+                                                      })
+                                                    : game.rootingInterest?.status.toUpperCase()}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between gap-1">
@@ -1175,7 +1480,12 @@ const BigTeamDisplay = ({ team, isOpponentWinner, align }: { team: Team, isOppon
                     <h2 className="text-base sm:text-lg md:text-xl lg:text-3xl font-black text-[#002E5D] tracking-tight leading-none">{team.shortName}</h2>
                     {align === 'right' && team.rank && <RankBadge rank={team.rank} />}
                 </div>
-                <p className="text-xs sm:text-sm md:text-base text-gray-600 font-medium">{team.record || '0-0'}</p>
+                <div className="flex items-center gap-2 text-xs sm:text-sm md:text-base text-gray-600 font-medium">
+                    <span>{team.record || '0-0'}</span>
+                    {team.sor !== null && team.sor !== undefined && (
+                        <span className="text-[10px] sm:text-xs md:text-sm text-gray-500">SOR: {team.sor}</span>
+                    )}
+                </div>
             </div>
 
             <div className={`text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-black font-mono tracking-tighter ${isWinner ? 'text-[#0062B8]' : 'text-[#002E5D]'}`}>
@@ -1199,6 +1509,12 @@ const TickerTeamRow = ({ team, hasBall, isRootedFor }: { team: Team, hasBall: bo
                     {team.shortName}
                     {isRootedFor && <span className="ml-0.5 sm:ml-1 text-[7px] sm:text-[8px] bg-yellow-400 text-black px-0.5 sm:px-1 rounded font-black">Preferred</span>}
                 </span>
+                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-gray-200 font-medium">
+                    <span>{team.record || '0-0'}</span>
+                    {team.sor !== null && team.sor !== undefined && (
+                        <span className="text-[8px] sm:text-[9px] text-gray-300">SOR: {team.sor}</span>
+                    )}
+                </div>
             </div>
             {hasBall && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0 ml-0.5 shadow-sm" />}
         </div>

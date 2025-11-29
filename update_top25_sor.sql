@@ -1,0 +1,31 @@
+-- Update SOR values for Top 25 teams
+-- Replace the SOR values below with actual values from ESPN FPI Resume page
+-- Format: UPDATE team_sor SET sor_value = X WHERE team_id = 'Y' AND season = 2025;
+
+-- Example updates (replace with actual SOR values from ESPN):
+-- UPDATE team_sor SET sor_value = 1 WHERE team_id = '333' AND season = 2025; -- Alabama
+-- UPDATE team_sor SET sor_value = 6 WHERE team_id = '130' AND season = 2025; -- Michigan
+-- UPDATE team_sor SET sor_value = 7 WHERE team_id = '264' AND season = 2025; -- Washington
+-- UPDATE team_sor SET sor_value = 8 WHERE team_id = '99' AND season = 2025; -- LSU
+-- UPDATE team_sor SET sor_value = 9 WHERE team_id = '201' AND season = 2025; -- Oklahoma
+-- UPDATE team_sor SET sor_value = 10 WHERE team_id = '251' AND season = 2025; -- Texas
+-- UPDATE team_sor SET sor_value = 11 WHERE team_id = '2633' AND season = 2025; -- Tennessee
+-- UPDATE team_sor SET sor_value = 12 WHERE team_id = '87' AND season = 2025; -- Notre Dame
+-- UPDATE team_sor SET sor_value = 13 WHERE team_id = '24' AND season = 2025; -- Stanford
+-- UPDATE team_sor SET sor_value = 14 WHERE team_id = '12' AND season = 2025; -- Arizona
+-- UPDATE team_sor SET sor_value = 15 WHERE team_id = '9' AND season = 2025; -- Arizona State
+-- UPDATE team_sor SET sor_value = 16 WHERE team_id = '221' AND season = 2025; -- Pittsburgh
+-- UPDATE team_sor SET sor_value = 17 WHERE team_id = '2390' AND season = 2025; -- Miami
+-- UPDATE team_sor SET sor_value = 18 WHERE team_id = '238' AND season = 2025; -- Vanderbilt
+-- UPDATE team_sor SET sor_value = 19 WHERE team_id = '59' AND season = 2025; -- Georgia Tech
+-- UPDATE team_sor SET sor_value = 20 WHERE team_id = '66' AND season = 2025; -- Iowa State
+-- UPDATE team_sor SET sor_value = 21 WHERE team_id = '197' AND season = 2025; -- Oklahoma State
+-- UPDATE team_sor SET sor_value = 22 WHERE team_id = '254' AND season = 2025; -- Utah
+-- UPDATE team_sor SET sor_value = 23 WHERE team_id = '2305' AND season = 2025; -- Kansas
+-- UPDATE team_sor SET sor_value = 24 WHERE team_id = '2641' AND season = 2025; -- Texas Tech
+-- UPDATE team_sor SET sor_value = 25 WHERE team_id = '277' AND season = 2025; -- West Virginia
+-- UPDATE team_sor SET sor_value = 26 WHERE team_id = '356' AND season = 2025; -- Mississippi State
+
+-- Note: The SOR values above are examples. Replace with actual values from ESPN FPI Resume page.
+-- Lower SOR numbers = better strength of record (1 is best, higher numbers are worse)
+
