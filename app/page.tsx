@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Trophy, Tv, MapPin, PlayCircle, ChevronLeft, ChevronRight, MousePointerClick, CheckCircle2, XCircle, AlertCircle, Lock, Unlock, X } from 'lucide-react';
 import { FaFootball } from 'react-icons/fa6';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 // --- Types ---
@@ -985,6 +986,13 @@ const ByuPage = () => {
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
                             <span className="text-[10px] sm:text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
                         </div>
+                        <Link 
+                            href="/playoffs"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation flex items-center gap-1.5 sm:gap-2"
+                        >
+                            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span>View Playoffs</span>
+                        </Link>
                         <button onClick={() => fetchGames()} className="p-2 sm:p-2.5 hover:bg-white/60 backdrop-blur-md rounded-full transition-all border border-transparent hover:border-white/40 touch-manipulation">
                             <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? 'animate-spin' : 'text-[#0062B8]'}`} />
                         </button>
