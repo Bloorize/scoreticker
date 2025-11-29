@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   description: "Track BYU football's journey to the College Football Playoff. Real-time scores, game predictions, rooting guide, and playoff odds.",
   keywords: ["BYU", "BYU Football", "College Football", "CFP", "College Football Playoff", "BYU Cougars", "Football Tracker"],
   authors: [{ name: "BYU Football Tracker" }],
+  other: {
+    "google-adsense-account": "ca-pub-2568418773305987",
+  },
   openGraph: {
     title: "BYU Football Tracker | Road to the CFP",
     description: "Track BYU football's journey to the College Football Playoff. Real-time scores, game predictions, rooting guide, and playoff odds.",
@@ -51,12 +54,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Google AdSense - Must be in head for verification */}
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2568418773305987"
-          strategy="beforeInteractive"
-          crossOrigin="anonymous"
-        />
         {/* Google Analytics */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-85RYBJ651R"
