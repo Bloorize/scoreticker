@@ -1026,14 +1026,22 @@ const ByuPage = () => {
                             <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">Last Updated</span>
                             <span className="text-[10px] sm:text-xs font-mono text-[#0062B8]">{lastUpdated.toLocaleTimeString()}</span>
                         </div>
-                        {/* View Playoffs button - hidden on mobile, shown below header */}
-                        <Link 
-                            href="/playoffs"
-                            className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation"
-                        >
-                            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            <span>View Playoffs</span>
-                        </Link>
+                        {/* Navigation buttons - hidden on mobile, shown below header */}
+                        <div className="hidden sm:flex items-center gap-2">
+                            <Link 
+                                href="/playoffs"
+                                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation"
+                            >
+                                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span>View Playoffs</span>
+                            </Link>
+                            <Link 
+                                href="/comparisons"
+                                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#002E5D] hover:bg-[#001d42] text-white text-xs sm:text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation"
+                            >
+                                <span>Comparisons</span>
+                            </Link>
+                        </div>
                         
                         {/* Share Button */}
                         <div className="relative">
@@ -1094,14 +1102,20 @@ const ByuPage = () => {
                     </div>
                 </header>
 
-                {/* View Playoffs button - Mobile only, positioned below header */}
-                <div className="sm:hidden px-3 pt-16 pb-1 relative z-10">
+                {/* Navigation buttons - Mobile only, positioned below header */}
+                <div className="sm:hidden px-3 pt-16 pb-1 relative z-10 space-y-2">
                     <Link 
                         href="/playoffs"
                         className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0062B8] hover:bg-[#0052A8] text-white text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation w-full"
                     >
                         <Trophy className="w-4 h-4" />
                         <span>View Playoffs</span>
+                    </Link>
+                    <Link 
+                        href="/comparisons"
+                        className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#002E5D] hover:bg-[#001d42] text-white text-sm font-bold rounded-lg transition-all border border-white/20 shadow-md hover:shadow-lg touch-manipulation w-full"
+                    >
+                        <span>Comparisons</span>
                     </Link>
                 </div>
 

@@ -948,6 +948,12 @@ const PlayoffsPage = () => {
                         <Link href="/" className="text-white hover:text-yellow-300 transition-colors">
                             <span className="text-sm font-bold">← Back</span>
                         </Link>
+                        <Link 
+                            href="/comparisons"
+                            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-lg transition-all border border-white/20 backdrop-blur-md"
+                        >
+                            Comparisons
+                        </Link>
                         <div>
                             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-1">COLLEGE FOOTBALL PLAYOFF</h1>
                             <p className="text-sm sm:text-base text-white/80">12-Team CFP Bracket</p>
