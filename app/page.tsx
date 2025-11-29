@@ -104,10 +104,10 @@ const ByuPage = () => {
     const [tickerPage, setTickerPage] = useState(0);
     const [isGameLocked, setIsGameLocked] = useState(false);
     const [currentGameIndex, setCurrentGameIndex] = useState(0);
-    const [slotsPerPage, setSlotsPerPage] = useState(2);
+    const [slotsPerPage, setSlotsPerPage] = useState(5); // Always 5 slots: 1 ad + 4 games
     const [mobileView, setMobileView] = useState<'game' | 'guide'>('game');
     const [leadersView, setLeadersView] = useState<'all' | 'away' | 'home'>('all');
-    const [showPlaysModal, setShowPlaysModal] = useState(false);
+    const [gameDetailView, setGameDetailView] = useState<'stats' | 'live'>('stats');
 
     const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
 
@@ -439,25 +439,40 @@ const ByuPage = () => {
         return () => clearInterval(interval);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Ticker Auto-Scroll - Responsive slots per page
+    // Initialize AdSense ads when component mounts
+    useEffect(() => {
+        try {
+            // @ts-ignore - adsbygoogle is loaded by AdSense script
+            if (typeof window !== 'undefined') {
+                ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+            }
+        } catch (err) {
+            console.error('AdSense initialization error:', err);
+        }
+    }, []);
+
+    // Ticker Auto-Scroll - Always show 4 games per page (slot 1 is ad)
     useEffect(() => {
         if (games.length === 0) return;
         const interval = setInterval(() => {
             setTickerPage(prev => {
-                const totalPages = Math.ceil(games.length / slotsPerPage);
+                const gamesPerPage = 4; // Always 4 games (slots 2-5)
+                const totalPages = Math.ceil(games.length / gamesPerPage);
                 const nextPage = prev + 1;
                 return nextPage < totalPages ? nextPage : 0;
             });
         }, 10000);
         return () => clearInterval(interval);
-    }, [games.length, slotsPerPage]);
+    }, [games.length]);
 
     // Auto-rotation removed - marquee only changes when user manually selects a game
 
     const activeGame = games.find(g => g.id === selectedGameId) || games[0];
-    // Responsive slots: 2 on mobile, 4 on tablet, 5 on desktop
-    const visibleTickerGames = games.slice(tickerPage * slotsPerPage, (tickerPage + 1) * slotsPerPage);
-    const emptySlotsCount = Math.max(0, slotsPerPage - visibleTickerGames.length);
+    // Always show 4 games (slots 2-5), slot 1 is always the ad
+    // Adjust slotsPerPage to account for ad taking 1 slot
+    const gamesPerPage = slotsPerPage - 1; // Subtract 1 for the ad slot
+    const visibleTickerGames = games.slice(tickerPage * gamesPerPage, (tickerPage + 1) * gamesPerPage);
+    const emptySlotsCount = Math.max(0, 4 - visibleTickerGames.length); // Always show 4 game slots (2-5)
     
     // Calculate BYU Playoff Odds
     const calculatePlayoffOdds = (): number => {
@@ -535,10 +550,11 @@ const ByuPage = () => {
     
     const playoffOdds = calculatePlayoffOdds();
     
-    // Update slots per page on resize
+    // Update slots per page on resize (always reserve 1 slot for ad, so show 4 games)
     useEffect(() => {
         const updateSlots = () => {
-            setSlotsPerPage(window.innerWidth >= 1024 ? 5 : window.innerWidth >= 640 ? 4 : 2);
+            // Always show 5 total slots: 1 ad + 4 games
+            setSlotsPerPage(5);
         };
         updateSlots();
         window.addEventListener('resize', updateSlots);
@@ -573,7 +589,8 @@ const ByuPage = () => {
 
     const nextTickerPage = () => {
         setTickerPage(prev => {
-            const totalPages = Math.ceil(games.length / slotsPerPage);
+            const gamesPerPage = 4; // Always 4 games (slots 2-5)
+            const totalPages = Math.ceil(games.length / gamesPerPage);
             const nextPage = prev + 1;
             return nextPage < totalPages ? nextPage : 0;
         });
@@ -581,7 +598,8 @@ const ByuPage = () => {
 
     const prevTickerPage = () => {
         setTickerPage(prev => {
-            const totalPages = Math.ceil(games.length / slotsPerPage);
+            const gamesPerPage = 4; // Always 4 games (slots 2-5)
+            const totalPages = Math.ceil(games.length / gamesPerPage);
             const prevPage = prev - 1;
             return prevPage >= 0 ? prevPage : totalPages - 1;
         });
@@ -591,7 +609,7 @@ const ByuPage = () => {
         <div className="flex flex-col h-screen bg-white text-gray-900 font-sans overflow-hidden">
 
             {/* Main Feature Area */}
-            <main className="flex-1 relative overflow-y-auto sm:overflow-hidden flex flex-col min-h-0">
+            <main className={`flex-1 relative flex flex-col min-h-0 ${gameDetailView === 'live' ? 'overflow-y-auto' : 'overflow-y-auto sm:overflow-hidden'}`}>
 
                 {/* Header Overlay */}
                 <header className="absolute top-0 w-full z-20 p-2 sm:p-2.5 md:p-3 flex flex-wrap justify-between items-center gap-2 sm:gap-3 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm">
@@ -679,10 +697,10 @@ const ByuPage = () => {
                 </header>
 
                 {/* Content Grid: Main Game + Sidebar */}
-                <div className="flex-1 flex flex-col sm:flex-row overflow-visible sm:overflow-hidden min-h-0">
+                <div className={`flex-1 flex flex-col sm:flex-row min-h-0 ${gameDetailView === 'live' ? 'overflow-visible' : 'overflow-visible sm:overflow-hidden'}`}>
 
                     {/* Left: Main Game Display */}
-                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-20 md:pt-20 min-h-0 flex-shrink-0 overflow-visible ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
+                    <div className={`flex-1 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 pb-40 sm:pb-36 md:pb-40 relative z-10 pt-32 sm:pt-20 md:pt-20 min-h-0 flex-shrink-0 ${gameDetailView === 'live' ? 'overflow-y-auto' : 'overflow-visible'} ${mobileView === 'guide' ? 'hidden sm:flex' : 'flex'}`}>
                         {activeGame ? (
                             <div className="w-full max-w-5xl flex flex-col items-center animate-in fade-in duration-700">
 
@@ -781,119 +799,179 @@ const ByuPage = () => {
                                         <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-[#0062B8]" />
                                         <span className="text-center">{activeGame.venue}</span>
                                     </div>
-                                    {activeGame.situation?.lastPlay && (
-                                        <button
-                                            onClick={() => setShowPlaysModal(true)}
-                                            className="mt-3 bg-white/60 backdrop-blur-xl border border-white/40 rounded-lg sm:rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-[#0062B8] hover:bg-white/80 transition-all shadow-md hover:shadow-lg flex items-center gap-1.5 mx-auto"
-                                        >
-                                            <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                                            See Plays
-                                        </button>
-                                    )}
                                 </div>
 
-                                {/* Matchup Predictor & Game Leaders - Side by Side */}
-                                <div className="mt-0 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 px-2 pb-20 sm:pb-28 md:pb-36 overflow-visible">
-                                    {/* Matchup Predictor */}
-                                    {activeGame.prediction ? (
-                                        <MatchupPredictor game={activeGame} />
-                                    ) : (
-                                        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex items-center justify-center">
-                                            <p className="text-[10px] sm:text-xs text-gray-500 text-center">No prediction data available</p>
-                                        </div>
-                                    )}
-
-                                    {/* Leaders Module */}
-                                    <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col">
-                                        <div className="mb-1.5 flex-shrink-0">
-                                            <h3 className="text-[10px] sm:text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-1 border-b border-gray-200/50 pb-1 sm:pb-1.5">Game Leaders</h3>
-                                            
-                                            {/* Team Filter Toggle */}
-                                            {activeGame.leaders && activeGame.leaders.length > 0 && (
-                                                <div className="flex gap-1 mt-1 bg-white/40 backdrop-blur-sm rounded-lg p-0.5 border border-white/30">
-                                                    <button
-                                                        onClick={() => setLeadersView('all')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
-                                                            leadersView === 'all'
-                                                                ? 'bg-[#0062B8] text-white shadow-sm'
-                                                                : 'text-gray-600 hover:bg-white/60'
-                                                        }`}
-                                                    >
-                                                        All
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setLeadersView('away')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
-                                                            leadersView === 'away'
-                                                                ? 'bg-[#0062B8] text-white shadow-sm'
-                                                                : 'text-gray-600 hover:bg-white/60'
-                                                        }`}
-                                                    >
-                                                        {activeGame.away.shortName}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setLeadersView('home')}
-                                                        className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
-                                                            leadersView === 'home'
-                                                                ? 'bg-[#0062B8] text-white shadow-sm'
-                                                                : 'text-gray-600 hover:bg-white/60'
-                                                        }`}
-                                                    >
-                                                        {activeGame.home.shortName}
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        
-                                        {activeGame.leaders && activeGame.leaders.length > 0 ? (
-                                            <div className="space-y-1.5 sm:space-y-2 flex-1 overflow-y-auto">
-                                                {(() => {
-                                                    // Filter leaders based on selected view
-                                                    let filteredLeaders = activeGame.leaders;
-                                                    if (leadersView === 'away') {
-                                                        filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.away.id);
-                                                    } else if (leadersView === 'home') {
-                                                        filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.home.id);
-                                                    }
-                                                    
-                                                    // Group by category and take top from each
-                                                    const categories = ['Passing', 'Rushing', 'Receiving'];
-                                                    const displayedLeaders: typeof activeGame.leaders = [];
-                                                    
-                                                    categories.forEach(cat => {
-                                                        const leader = filteredLeaders.find(l => l.name.toLowerCase().includes(cat.toLowerCase()));
-                                                        if (leader) displayedLeaders.push(leader);
-                                                    });
-                                                    
-                                                    // If no category match, just show first 3
-                                                    if (displayedLeaders.length === 0) {
-                                                        displayedLeaders.push(...filteredLeaders.slice(0, 3));
-                                                    }
-                                                    
-                                                    return displayedLeaders.map((leader, i) => (
-                                                        <div key={i} className="flex items-center gap-2 sm:gap-2.5">
-                                                            {leader.athlete.headshot ? (
-                                                                // eslint-disable-next-line @next/next/no-img-element
-                                                                <img src={leader.athlete.headshot} alt="" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
-                                                            ) : (
-                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[9px] sm:text-[10px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
-                                                            )}
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs sm:text-sm font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
-                                                                <div className="text-[10px] sm:text-xs text-gray-600 truncate">{leader.name}</div>
-                                                            </div>
-                                                            <div className="text-xs sm:text-sm font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
-                                                        </div>
-                                                    ));
-                                                })()}
-                                            </div>
-                                        ) : (
-                                            <div className="flex-1 flex items-center justify-center">
-                                                <p className="text-[10px] sm:text-xs text-gray-500 text-center">No leader data available</p>
-                                            </div>
+                                {/* Tabs for Stats/Live Game */}
+                                <div className="max-w-4xl w-full px-2 mb-3">
+                                    <div className="flex gap-2 bg-white/40 backdrop-blur-sm rounded-lg p-1 border border-white/30 shadow-md">
+                                        <button
+                                            onClick={() => setGameDetailView('stats')}
+                                            className={`flex-1 px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
+                                                gameDetailView === 'stats'
+                                                    ? 'bg-[#0062B8] text-white shadow-sm'
+                                                    : 'text-gray-600 hover:bg-white/60'
+                                            }`}
+                                        >
+                                            Stats
+                                        </button>
+                                        {activeGame.isLive && activeGame.situation?.lastPlay && (
+                                            <button
+                                                onClick={() => setGameDetailView('live')}
+                                                className={`flex-1 px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
+                                                    gameDetailView === 'live'
+                                                        ? 'bg-[#0062B8] text-white shadow-sm'
+                                                        : 'text-gray-600 hover:bg-white/60'
+                                                }`}
+                                            >
+                                                Live Game
+                                            </button>
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Content based on selected tab */}
+                                {gameDetailView === 'stats' ? (
+                                    /* Matchup Predictor & Game Leaders - Side by Side */
+                                    <div className="mt-0 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 px-2 pb-20 sm:pb-28 md:pb-36 overflow-visible">
+                                        {/* Matchup Predictor */}
+                                        {activeGame.prediction ? (
+                                            <MatchupPredictor game={activeGame} />
+                                        ) : (
+                                            <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex items-center justify-center">
+                                                <p className="text-[10px] sm:text-xs text-gray-500 text-center">No prediction data available</p>
+                                            </div>
+                                        )}
+
+                                        {/* Leaders Module */}
+                                        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-white/40 shadow-lg w-full min-h-[240px] sm:min-h-[260px] flex flex-col">
+                                            <div className="mb-1.5 flex-shrink-0">
+                                                <h3 className="text-[10px] sm:text-xs font-bold text-[#002E5D] uppercase tracking-widest mb-1 border-b border-gray-200/50 pb-1 sm:pb-1.5">Game Leaders</h3>
+                                                
+                                                {/* Team Filter Toggle */}
+                                                {activeGame.leaders && activeGame.leaders.length > 0 && (
+                                                    <div className="flex gap-1 mt-1 bg-white/40 backdrop-blur-sm rounded-lg p-0.5 border border-white/30">
+                                                        <button
+                                                            onClick={() => setLeadersView('all')}
+                                                            className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
+                                                                leadersView === 'all'
+                                                                    ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                    : 'text-gray-600 hover:bg-white/60'
+                                                            }`}
+                                                        >
+                                                            All
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setLeadersView('away')}
+                                                            className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
+                                                                leadersView === 'away'
+                                                                    ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                    : 'text-gray-600 hover:bg-white/60'
+                                                            }`}
+                                                        >
+                                                            {activeGame.away.shortName}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setLeadersView('home')}
+                                                            className={`flex-1 px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${
+                                                                leadersView === 'home'
+                                                                    ? 'bg-[#0062B8] text-white shadow-sm'
+                                                                    : 'text-gray-600 hover:bg-white/60'
+                                                            }`}
+                                                        >
+                                                            {activeGame.home.shortName}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            {activeGame.leaders && activeGame.leaders.length > 0 ? (
+                                                <div className="space-y-1.5 sm:space-y-2 flex-1 overflow-y-auto">
+                                                    {(() => {
+                                                        // Filter leaders based on selected view
+                                                        let filteredLeaders = activeGame.leaders;
+                                                        if (leadersView === 'away') {
+                                                            filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.away.id);
+                                                        } else if (leadersView === 'home') {
+                                                            filteredLeaders = activeGame.leaders.filter(l => l.teamId === activeGame.home.id);
+                                                        }
+                                                        
+                                                        // Group by category and take top from each
+                                                        const categories = ['Passing', 'Rushing', 'Receiving'];
+                                                        const displayedLeaders: typeof activeGame.leaders = [];
+                                                        
+                                                        categories.forEach(cat => {
+                                                            const leader = filteredLeaders.find(l => l.name.toLowerCase().includes(cat.toLowerCase()));
+                                                            if (leader) displayedLeaders.push(leader);
+                                                        });
+                                                        
+                                                        // If no category match, just show first 3
+                                                        if (displayedLeaders.length === 0) {
+                                                            displayedLeaders.push(...filteredLeaders.slice(0, 3));
+                                                        }
+                                                        
+                                                        return displayedLeaders.map((leader, i) => (
+                                                            <div key={i} className="flex items-center gap-2 sm:gap-2.5">
+                                                                {leader.athlete.headshot ? (
+                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                                    <img src={leader.athlete.headshot} alt="" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm object-cover border border-white/50 shadow-sm flex-shrink-0" />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 flex items-center justify-center text-[9px] sm:text-[10px] text-gray-600 shadow-sm flex-shrink-0">{leader.athlete.position}</div>
+                                                                )}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="text-xs sm:text-sm font-bold text-gray-900 truncate">{leader.athlete.shortName}</div>
+                                                                    <div className="text-[10px] sm:text-xs text-gray-600 truncate">{leader.name}</div>
+                                                                </div>
+                                                                <div className="text-xs sm:text-sm font-mono font-bold text-[#0062B8] flex-shrink-0">{leader.displayValue}</div>
+                                                            </div>
+                                                        ));
+                                                    })()}
+                                                </div>
+                                            ) : (
+                                                <div className="flex-1 flex items-center justify-center">
+                                                    <p className="text-[10px] sm:text-xs text-gray-500 text-center">No leader data available</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* Live Game View - Last Play and Field Position */
+                                    <div className="max-w-4xl w-full px-2 pb-20 sm:pb-28 md:pb-36">
+                                        <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/40 shadow-lg">
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <PlayCircle className="w-5 h-5 sm:w-6 sm:h-6 text-[#0062B8]" />
+                                                <h3 className="text-base sm:text-lg font-black text-[#0062B8] uppercase tracking-wider">Last Play</h3>
+                                            </div>
+                                            
+                                            <div className="bg-white/60 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/40 mb-6">
+                                                <p className="text-sm sm:text-base md:text-lg text-gray-800 leading-relaxed font-medium text-center">
+                                                    {activeGame.situation?.lastPlay ? `"${activeGame.situation.lastPlay}"` : 'No play data available'}
+                                                </p>
+                                            </div>
+
+                                            {/* Football Field */}
+                                            {activeGame.situation?.yardLine !== undefined && activeGame.situation?.possession ? (
+                                                <FootballField 
+                                                    yardLine={activeGame.situation.yardLine}
+                                                    possession={activeGame.situation.possession}
+                                                    homeTeam={activeGame.home}
+                                                    awayTeam={activeGame.away}
+                                                    isRedZone={activeGame.situation.isRedZone || false}
+                                                    activeGame={activeGame}
+                                                />
+                                            ) : (
+                                                /* DEV: Show field with default values for development */
+                                                <FootballField 
+                                                    yardLine={50}
+                                                    possession={activeGame.home.id}
+                                                    homeTeam={activeGame.home}
+                                                    awayTeam={activeGame.away}
+                                                    isRedZone={false}
+                                                    activeGame={activeGame}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div className="text-gray-400">Loading Playoff Scenarios...</div>
@@ -981,6 +1059,21 @@ const ByuPage = () => {
     </button>
 
     <div className="flex-1 flex divide-x divide-white/10 min-w-0 relative overflow-hidden">
+        {/* Slot 1: Always show AdSense Ad */}
+        <div className="flex-1 flex items-center justify-center px-2 sm:px-3 md:px-3 py-1.5 sm:py-2 border-r border-white/10 min-h-0 flex-shrink-0">
+            <div className="w-full h-full flex items-center justify-center bg-white/5 backdrop-blur-sm rounded">
+                <ins
+                    className="adsbygoogle"
+                    style={{ display: 'block', width: '100%' }}
+                    data-ad-client="ca-pub-2568418773305987"
+                    data-ad-slot="8653145512"
+                    data-ad-format="auto"
+                    data-full-width-responsive="true"
+                />
+            </div>
+        </div>
+        
+        {/* Slots 2-5: Games (always show 4 slots) */}
         {visibleTickerGames.map((game) => (
             <button
                 key={game.id}
@@ -1034,8 +1127,8 @@ const ByuPage = () => {
                 </div>
             </button>
         ))}
-
-        {/* Fill empty slots to maintain consistent layout */}
+        
+        {/* Fill remaining game slots (2-5) with empty divs to always show 4 game slots */}
         {Array.from({ length: emptySlotsCount }).map((_, i) => (
             <div key={`empty-${i}`} className="flex-1 bg-transparent backdrop-blur-sm border-r border-white/10 last:border-r-0"></div>
         ))}
@@ -1047,56 +1140,6 @@ const ByuPage = () => {
 </div>
             </footer>
 
-            {/* Plays Modal */}
-            {showPlaysModal && activeGame.situation?.lastPlay && (
-                <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
-                    onClick={() => setShowPlaysModal(false)}
-                >
-                    <div 
-                        className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-2xl w-full border border-white/40 shadow-2xl my-4"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <PlayCircle className="w-5 h-5 sm:w-6 sm:h-6 text-[#0062B8]" />
-                                <h3 className="text-base sm:text-lg font-black text-[#0062B8] uppercase tracking-wider">Last Play</h3>
-                            </div>
-                            <button
-                                onClick={() => setShowPlaysModal(false)}
-                                className="p-1.5 sm:p-2 hover:bg-white/60 rounded-lg transition-all"
-                            >
-                                <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-                            </button>
-                        </div>
-                        
-                        <div className="bg-white/60 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/40 mb-4">
-                            <p className="text-sm sm:text-base md:text-lg text-gray-800 leading-relaxed font-medium text-center">
-                                "{activeGame.situation.lastPlay}"
-                            </p>
-                        </div>
-
-                        {/* Football Field */}
-                        {activeGame.situation.yardLine !== undefined && activeGame.situation.possession && (
-                            <FootballField 
-                                yardLine={activeGame.situation.yardLine}
-                                possession={activeGame.situation.possession}
-                                homeTeam={activeGame.home}
-                                awayTeam={activeGame.away}
-                                isRedZone={activeGame.situation.isRedZone}
-                                activeGame={activeGame}
-                            />
-                        )}
-
-                        {activeGame.venue && (
-                            <div className="mt-4 flex items-center justify-center gap-2 text-gray-600 text-xs sm:text-sm">
-                                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>{activeGame.venue}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
