@@ -449,6 +449,82 @@ const ByuPage = () => {
     const visibleTickerGames = games.slice(tickerPage * slotsPerPage, (tickerPage + 1) * slotsPerPage);
     const emptySlotsCount = Math.max(0, slotsPerPage - visibleTickerGames.length);
     
+    // Calculate BYU Playoff Odds
+    const calculatePlayoffOdds = (): number => {
+        // Find BYU's game data
+        const byuGame = games.find(g => 
+            g.away.shortName === 'BYU' || g.home.shortName === 'BYU' ||
+            g.away.name.toLowerCase().includes('brigham young') || 
+            g.home.name.toLowerCase().includes('brigham young')
+        );
+        
+        if (!byuGame) return 0;
+        
+        const byuTeam = byuGame.away.shortName === 'BYU' || byuGame.away.name.toLowerCase().includes('brigham young') 
+            ? byuGame.away 
+            : byuGame.home;
+        
+        // Parse record (format: "11-1" or "10-2")
+        const recordMatch = byuTeam.record?.match(/(\d+)-(\d+)/);
+        if (!recordMatch) return 0;
+        
+        const wins = parseInt(recordMatch[1]);
+        const losses = parseInt(recordMatch[2]);
+        const totalGames = wins + losses;
+        
+        // Base odds from win percentage
+        const winPercentage = wins / Math.max(totalGames, 1);
+        let baseOdds = 0;
+        
+        // Realistic base odds based on record
+        if (wins >= 12 && losses <= 1) baseOdds = 85; // 12-1 or better
+        else if (wins >= 11 && losses <= 1) baseOdds = 70; // 11-1
+        else if (wins >= 11 && losses <= 2) baseOdds = 55; // 11-2
+        else if (wins >= 10 && losses <= 2) baseOdds = 40; // 10-2
+        else if (wins >= 10 && losses <= 3) baseOdds = 25; // 10-3
+        else if (wins >= 9 && losses <= 3) baseOdds = 15; // 9-3
+        else if (wins >= 9 && losses <= 4) baseOdds = 8; // 9-4
+        else if (wins >= 8 && losses <= 4) baseOdds = 3; // 8-4
+        else baseOdds = 1; // Below 8-4
+        
+        // Ranking multiplier
+        let rankingBonus = 0;
+        if (byuTeam.rank) {
+            if (byuTeam.rank <= 4) rankingBonus = 15; // Top 4
+            else if (byuTeam.rank <= 8) rankingBonus = 10; // Top 8
+            else if (byuTeam.rank <= 12) rankingBonus = 5; // Top 12
+            else if (byuTeam.rank <= 20) rankingBonus = 2; // Top 20
+        }
+        
+        // Rooting guide outcomes impact
+        let rootingImpact = 0;
+        const rootingGames = games.filter(g => g.rootingInterest);
+        const wonGames = rootingGames.filter(g => g.rootingInterest?.status === 'won').length;
+        const lostGames = rootingGames.filter(g => g.rootingInterest?.status === 'lost').length;
+        const pendingGames = rootingGames.filter(g => g.rootingInterest?.status === 'pending').length;
+        
+        // Each win helps, each loss hurts
+        rootingImpact = (wonGames * 3) - (lostGames * 4);
+        
+        // Pending games add uncertainty (reduce confidence, not odds)
+        // If many games are pending, odds are more uncertain
+        
+        // Strength of schedule adjustment (simplified)
+        // Assume BYU plays in Big 12, which is a Power 5 conference
+        const conferenceBonus = 5;
+        
+        // Calculate final odds
+        let finalOdds = baseOdds + rankingBonus + rootingImpact + conferenceBonus;
+        
+        // Cap between 0 and 95 (never 100% certain)
+        finalOdds = Math.max(0, Math.min(95, finalOdds));
+        
+        // Round to 1 decimal place
+        return Math.round(finalOdds * 10) / 10;
+    };
+    
+    const playoffOdds = calculatePlayoffOdds();
+    
     // Update slots per page on resize
     useEffect(() => {
         const updateSlots = () => {
@@ -765,10 +841,26 @@ const ByuPage = () => {
                     {/* Right: Playoff Implications Sidebar */}
                     <div className={`w-full sm:w-80 lg:w-72 xl:w-80 bg-white/40 backdrop-blur-xl border-l border-white/30 sm:border-t-0 border-t border-white/20 flex flex-col pt-0 sm:pt-24 shadow-lg min-h-[400px] sm:min-h-0 flex-shrink-0 ${mobileView === 'game' ? 'hidden sm:flex' : 'flex'}`}>
                         <div className="p-3 sm:p-4 border-b border-white/20 bg-[#0062B8]/90 backdrop-blur-xl flex-shrink-0 sticky top-0 z-10">
-                            <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                            <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-2 mb-2">
                                 <Trophy className="w-4 h-4 text-white" />
                                 Rooting Guide
                             </h2>
+                            
+                            {/* Playoff Odds Widget */}
+                            <div className="bg-white/20 backdrop-blur-xl rounded-lg p-1.5 sm:p-2 border border-white/30 shadow-lg">
+                                <div className="text-[7px] sm:text-[8px] font-bold text-white/90 uppercase tracking-widest mb-0.5 text-center">
+                                    Playoff Odds
+                                </div>
+                                <div className="flex items-baseline justify-center gap-0.5">
+                                    <span className="text-lg sm:text-xl md:text-2xl font-black text-white">
+                                        {playoffOdds.toFixed(1)}
+                                    </span>
+                                    <span className="text-[10px] sm:text-xs font-bold text-white/80">%</span>
+                                </div>
+                                <div className="text-[6px] sm:text-[7px] text-white/70 text-center mt-0.5 italic">
+                                    Based on record, ranking & outcomes
+                                </div>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 min-h-0 -webkit-overflow-scrolling-touch">
                             {/* Responsive grid: 1 column on mobile, 2 on larger screens */}
