@@ -784,7 +784,7 @@ const ByuPage = () => {
         
         // Realistic base odds - committee is harsh on non-SEC teams
         if (wins >= 12 && losses <= 1) baseOdds = 70; // 12-1 or better
-        else if (wins >= 11 && losses <= 1) baseOdds = 55; // 11-1 (adjusted for 55-65% target)
+        else if (wins >= 11 && losses <= 1) baseOdds = 58; // 11-1 (adjusted for 60-63% target)
         else if (wins >= 11 && losses <= 2) baseOdds = 35; // 11-2
         else if (wins >= 10 && losses <= 2) baseOdds = 22; // 10-2
         else if (wins >= 10 && losses <= 3) baseOdds = 12; // 10-3
@@ -798,7 +798,7 @@ const ByuPage = () => {
         if (byuTeam.rank) {
             if (byuTeam.rank <= 4) rankingBonus = 10; // Top 4
             else if (byuTeam.rank <= 8) rankingBonus = 7; // Top 8
-            else if (byuTeam.rank <= 12) rankingBonus = 4; // Top 12
+            else if (byuTeam.rank <= 12) rankingBonus = 5; // Top 12 (increased from 4 to 5)
             else if (byuTeam.rank <= 20) rankingBonus = 2; // Top 20
         }
         
@@ -812,13 +812,13 @@ const ByuPage = () => {
         // Each win helps, each loss hurts
         rootingImpact = (wonGames * 2) - (lostGames * 3);
         
-        // COMMITTEE BIAS PENALTY - BYU gets penalized (reduced slightly)
+        // COMMITTEE BIAS PENALTY - BYU gets penalized (reduced for 60-63% target)
         // The committee historically undervalues BYU and other non-SEC teams
-        const committeeBiasPenalty = 8; // Reduced from 12 to allow 11-1 to reach 55-65%
+        const committeeBiasPenalty = 6; // Reduced from 8 to allow 11-1 to reach 60-63%
         
         // Conference adjustment - Big 12 is Power 4 but not SEC
         // SEC teams get automatic favoritism, Big 12 gets slight penalty
-        const conferenceAdjustment = -2; // Reduced from -3
+        const conferenceAdjustment = -2; // Small penalty for not being SEC
         
         // Strength of Record (SOR) impact - if available
         let sorBonus = 0;
@@ -1617,7 +1617,7 @@ const ByuPage = () => {
                                     </p>
                                     <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
                                         <li><strong className="text-white">12-1 or better:</strong> 70% base</li>
-                                        <li><strong className="text-white">11-1:</strong> 55% base</li>
+                                        <li><strong className="text-white">11-1:</strong> 58% base</li>
                                         <li><strong className="text-white">11-2:</strong> 35% base</li>
                                         <li><strong className="text-white">10-2:</strong> 22% base</li>
                                         <li><strong className="text-white">10-3:</strong> 12% base</li>
@@ -1638,7 +1638,7 @@ const ByuPage = () => {
                                     <ul className="text-white/80 text-sm mt-2 space-y-1 ml-4 list-disc">
                                         <li><strong className="text-white">Rank 1-4:</strong> +10% bonus</li>
                                         <li><strong className="text-white">Rank 5-8:</strong> +7% bonus</li>
-                                        <li><strong className="text-white">Rank 9-12:</strong> +4% bonus</li>
+                                        <li><strong className="text-white">Rank 9-12:</strong> +5% bonus</li>
                                         <li><strong className="text-white">Rank 13-20:</strong> +2% bonus</li>
                                     </ul>
                                 </div>
