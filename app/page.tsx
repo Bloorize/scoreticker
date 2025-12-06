@@ -77,24 +77,19 @@ interface Game {
 
 // --- Rooting Logic ---
 // Specific matchups we care about (team we want to win vs their opponent)
-// 2025 Rivalry Week Games (Nov 28-30)
+// 2024 Conference Championship Games (Dec 7)
 const MATCHUP_LIST = [
-    { team: 'BYU', opponent: 'UCF', priority: 1 },
-    { team: 'Mississippi State', opponent: 'Ole Miss', priority: 2 },
-    { team: 'Washington', opponent: 'Oregon', priority: 3 },
-    { team: 'Auburn', opponent: 'Alabama', priority: 4 },
-    { team: 'LSU', opponent: 'Oklahoma', priority: 5 },
-    { team: 'Arizona', opponent: 'Arizona State', priority: 6 },
-    { team: 'Stanford', opponent: 'Notre Dame', priority: 7 },
-    { team: 'Ohio State', opponent: 'Michigan', priority: 8 },
-    { team: 'Pittsburgh', opponent: 'Miami', priority: 9 },
-    { team: 'Tennessee', opponent: 'Vanderbilt', priority: 10 },
-    { team: 'Texas A&M', opponent: 'Texas', priority: 11 },
-    { team: 'Georgia Tech', opponent: 'Georgia', priority: 12 },
-    { team: 'Iowa State', opponent: 'Oklahoma State', priority: 13 },
-    { team: 'East Carolina', opponent: 'FAU', priority: 14 },
-    { team: 'Utah', opponent: 'Kansas', priority: 15 }, // You Decide
-    { team: 'Texas Tech', opponent: 'West Virginia', priority: 16 }, // You Decide
+    { team: 'BYU', opponent: 'TCU', priority: 1 }, // Big 12 Championship - MUST WIN for playoff hopes
+    { team: 'Georgia', opponent: 'Alabama', priority: 2 }, // SEC Championship - helps BYU if Alabama loses
+    { team: 'Michigan', opponent: 'Iowa', priority: 3 }, // Big Ten Championship - helps BYU if Michigan wins
+    { team: 'Washington', opponent: 'Oregon', priority: 4 }, // Pac-12 Championship - helps BYU if Oregon loses
+    { team: 'Florida State', opponent: 'Louisville', priority: 5 }, // ACC Championship - helps BYU if Louisville loses
+    { team: 'Texas', opponent: 'Oklahoma State', priority: 6 }, // Big 12 CCG - helps BYU if Texas loses
+    { team: 'Tulane', opponent: 'SMU', priority: 7 }, // AAC Championship - helps BYU if SMU loses
+    { team: 'Liberty', opponent: 'New Mexico State', priority: 8 }, // CUSA Championship - helps BYU if Liberty loses
+    { team: 'Toledo', opponent: 'Miami (OH)', priority: 9 }, // MAC Championship
+    { team: 'Boise State', opponent: 'UNLV', priority: 10 }, // MWC Championship - helps BYU if Boise loses
+    { team: 'Appalachian State', opponent: 'Troy', priority: 11 }, // Sun Belt Championship
 ];
 
 // SOR data will be fetched from Supabase
@@ -117,7 +112,7 @@ const ByuPage = () => {
     const [showShareMenu, setShowShareMenu] = useState(false);
     const [showOddsModal, setShowOddsModal] = useState(false);
 
-    const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251128-20251130&limit=200&groups=80";
+    const DATA_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20251206&limit=200&groups=80";
 
     const fetchGames = async (sorDataOverride?: Record<string, number | null>) => {
         try {
@@ -251,6 +246,22 @@ const ByuPage = () => {
                         'kansas': (n, s) => n === 'kansas' || (n.includes('kansas') && !n.includes('state')),
                         'texas tech': (n, s) => n.includes('texas tech') || s === 'texas tech',
                         'west virginia': (n, s) => n.includes('west virginia'),
+                        'tcu': (n, s) => n.includes('tcu') || n.includes('texas christian') || s === 'tcu',
+                        'texas christian': (n, s) => n.includes('tcu') || n.includes('texas christian') || s === 'tcu',
+                        'iowa': (n, s) => (n === 'iowa' || n.includes('iowa')) && !n.includes('state'),
+                        'louisville': (n, s) => n.includes('louisville'),
+                        'florida state': (n, s) => n.includes('florida state') || s === 'florida st' || s === 'fsu',
+                        'smu': (n, s) => n.includes('southern methodist') || s === 'smu',
+                        'southern methodist': (n, s) => n.includes('southern methodist') || s === 'smu',
+                        'tulane': (n, s) => n.includes('tulane'),
+                        'new mexico state': (n, s) => n.includes('new mexico state') || s === 'new mexico st',
+                        'liberty': (n, s) => n.includes('liberty'),
+                        'miami (oh)': (n, s) => (n.includes('miami') && (n.includes('ohio') || n.includes('(oh)'))) || s === 'miami (oh)',
+                        'toledo': (n, s) => n.includes('toledo'),
+                        'unlv': (n, s) => n.includes('unlv') || n.includes('nevada-las vegas'),
+                        'boise state': (n, s) => n.includes('boise state') || s === 'boise st',
+                        'troy': (n, s) => n.includes('troy'),
+                        'appalachian state': (n, s) => n.includes('appalachian state') || n.includes('app state') || s === 'app st',
                     };
 
                     const matcher = exactMappings[targetLower];
@@ -402,19 +413,26 @@ const ByuPage = () => {
                 };
             });
 
-            // Filter for Rooting Interests ONLY
+            // Show all games, but prioritize those with rooting interests
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const filteredGames = allGames.filter((g: any) => g.rootingInterest !== undefined);
+            const filteredGames = allGames; // Show all games on championship day
 
-            // Sort: Active/Finished games first, then by importance
+            // Sort: Games with rooting interest first, then by status, then by importance
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             filteredGames.sort((a: any, b: any) => {
-                // Helper function to get sort priority (lower number = higher priority)
+                // Games with rooting interest get highest priority
+                const aHasRooting = a.rootingInterest !== undefined;
+                const bHasRooting = b.rootingInterest !== undefined;
+                if (aHasRooting !== bHasRooting) {
+                    return aHasRooting ? -1 : 1;
+                }
+                
+                // Helper function to get status priority (lower number = higher priority)
                 const getStatusPriority = (game: any) => {
                     // Active games (isLive) get highest priority
                     if (game.isLive) return 0;
-                    // Finished games (won/lost) get second priority
-                    if (game.rootingInterest?.status === 'won' || game.rootingInterest?.status === 'lost') return 1;
+                    // Finished games get second priority
+                    if (game.status === 'post' || game.home.isWinner !== undefined) return 1;
                     // Pending games get lowest priority
                     return 2;
                 };
@@ -422,12 +440,12 @@ const ByuPage = () => {
                 const aStatusPriority = getStatusPriority(a);
                 const bStatusPriority = getStatusPriority(b);
                 
-                // First sort by status (active/finished first)
+                // Sort by status (active/finished first)
                 if (aStatusPriority !== bStatusPriority) {
                     return aStatusPriority - bStatusPriority;
                 }
                 
-                // If same status, sort by importance
+                // If same status, sort by importance (rooting interest priority)
                 return (a.rootingInterest?.importance || 99) - (b.rootingInterest?.importance || 99);
             });
 
@@ -957,7 +975,7 @@ const ByuPage = () => {
                         </div>
                         <div className="flex-shrink-0">
                             <h1 className="text-sm sm:text-lg md:text-xl font-black italic tracking-tighter text-[#0062B8] leading-tight">PLAYOFF<span className="text-[#002E5D]">TRACKER</span></h1>
-                            <p className="text-[9px] sm:text-[10px] text-gray-600 font-medium tracking-widest uppercase leading-tight">Road to the CFP</p>
+                            <p className="text-[9px] sm:text-[10px] text-gray-600 font-medium tracking-widest uppercase leading-tight">Championship Saturday</p>
                         </div>
                     </div>
                     
